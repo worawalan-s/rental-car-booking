@@ -20,6 +20,9 @@ app.use(cookieParser());
 // Query parser
 app.set('query parser', 'extended');
 
+// Route files
+const auth = require('./routes/auth');
+
 // Base health check
 app.get('/api/v1/health', (req, res) => {
   res.status(200).json({
@@ -27,6 +30,9 @@ app.get('/api/v1/health', (req, res) => {
     message: 'Rental Car Booking API is running',
   });
 });
+
+// Mount routers
+app.use('/api/v1/auth', auth);
 
 const PORT = process.env.PORT || 5000;
 
