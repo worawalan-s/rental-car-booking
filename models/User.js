@@ -33,6 +33,11 @@ const UserSchema = new mongoose.Schema({
   },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
+  driverLicense: {
+    idNumber: { type: String, trim: true },
+    imageUrl: { type: String, trim: true },
+    verified: { type: Boolean, default: false },
+  },
   createdAt: {
     type: Date,
     default: Date.now,
