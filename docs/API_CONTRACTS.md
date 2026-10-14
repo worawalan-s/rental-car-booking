@@ -179,6 +179,46 @@ erDiagram
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/cars` | Public | List cars with filtering (`?category=Sedan`), sorting (`?sort=dailyRate`), pagination (`?page=1&limit=10`), and populated `provider` + `bookings` |
 | `GET` | `/api/v1/cars/:id` | Public | Get single car with populated `provider` and virtual `bookings` |
-| `POST` | `/api/v1/cars` | Private (Admin) | Create new car. Validates provider existence. |
-| `PUT` | `/api/v1/cars/:id` | Private (Admin) | Update car attributes with validation |
+| `POST` | `/api/v1/cars` | Private (Admin) | Create new car with schema-enforced validations and Satang rate |
+| `PUT` | `/api/v1/cars/:id` | Private (Admin) | Update car attributes with schema validators |
 | `DELETE` | `/api/v1/cars/:id` | Private (Admin) | Delete car with **cascading delete** of associated bookings |
+
+---
+
+## 4. Input & Business Validation (Hybrid Architecture)
+
+The system employs a **Hybrid Validation Architecture** combining schema-level data integrity (Instructor Pattern) with dedicated business rule validation middleware:
+
+1. **Schema-Level Data Integrity (`models/`)**: Mongoose Schemas handle formatting, string trimming (`trim: true`), case normalization (`lowercase: true`), regex validation, and data type coercion natively.
+2. **Business Validation Middleware (`middleware/validate.js`)**: Intercepts requests before reaching core logic to enforce temporal and operational constraints (e.g., date ordering, non-past dates, duration limits, and quota bounds).
+3. **Clean Route Signatures (`routes/`)**: Route definitions remain clean and idiomatic, delegating business validation to middleware where appropriate and field integrity to Mongoose schemas.
+
+### 4.1 Error Response Standard
+When validation fails, endpoints respond with HTTP `400 Bad Request`:
+```json
+{
+  "success": false,
+  "message": "Specific error explanation"
+}
+```
+
+### 4.2 Validation Rules & Field Specifications
+
+| Layer | Resource / Field | Constraint / Rule | Rejection / Validation Behavior |
+| :--- | :--- | :--- | :--- |
+| **Schema** | `User.name` | String, 2–50 characters, auto-trimmed | `"Please add a name"`, max 50 chars |
+| **Schema** | `User.tel` | 10 digits Thai format (`^0[0-9]{9}$`), auto-trimmed | `"Please add a valid 10-digit Thai phone number (0xxxxxxxxx)"` |
+| **Schema** | `User.email` | RFC 5322 regex format, auto-trimmed, lowercased | `"Please add a valid email"` |
+| **Schema** | `User.password` | String, min length 6, hashed with bcrypt | `"Please add a password"` (min length 6) |
+| **Schema** | `User.role` | Enum: `['user', 'admin']` (default `'user'`) | Whitelist validation |
+| **Schema** | `Car.category` | Enum: `['Sedan', 'SUV', 'Hatchback', 'Van', 'Truck', 'Luxury', 'Electric']` | Whitelist validation |
+| **Schema** | `Car.dailyRate` | **Positive Integer in Satang** (`Number.isInteger`, `min: 1`) | `"Daily rate must be an integer in Satang (e.g. 150000)"` |
+| **Schema** | `Car.capacity` | Integer >= 1 (default 4) | `"Capacity must be at least 1 person"` |
+| **Schema** | `Booking.numOfCars` | Integer between 1 and 3 | **Enforces 3-car quota limit per booking** |
+| **Schema** | `Booking.endDate` | Must be on or after `startDate` | `"Rental return date cannot be before start date"` |
+| **Middleware** | `Booking.startDate` | ISO Date, **cannot be in the past** (`>= today 00:00:00`) | `"Rental start date cannot be in the past"` |
+| **Middleware** | `Booking.endDate` | **Same-day rental supported** (`startDate === endDate` counts as 1 day) | Return date cannot precede start date |
+| **Middleware** | Booking Duration | Max 30 days per reservation | `"Rental duration cannot exceed 30 days per booking"` |
+| **Middleware** | `Booking.addOns` | Array of `{ addOn: ObjectId, quantity: >= 1, price: >= 0 }` | `"Each addOn item must contain a valid addOn ID"` |
+
+
