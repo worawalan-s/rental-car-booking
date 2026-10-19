@@ -117,7 +117,9 @@ exports.logout = async (req, res, next) => {
 //@access   Private
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).select(
+      '-password -resetPasswordToken -resetPasswordExpire'
+    );
 
     res.status(200).json({
       success: true,
