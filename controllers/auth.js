@@ -47,6 +47,12 @@ exports.register = async (req, res, next) => {
     sendTokenResponse(user, 201, res);
     
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already in use',
+      });
+    }
     res.status(400).json({
       success: false,
       message: err.message,
@@ -65,16 +71,16 @@ exports.login = async (req, res, next) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        msg: 'Please provide an email and password',
+        message: 'Please provide an email and password',
       });
     }
 
     // Check for user
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        msg: 'Invalid credentials',
+        message: 'Invalid credentials',
       });
     }
 
@@ -83,7 +89,7 @@ exports.login = async (req, res, next) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        msg: 'Invalid credentials',
+        message: 'Invalid credentials',
       });
     }
 
