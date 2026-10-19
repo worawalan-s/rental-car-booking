@@ -30,15 +30,15 @@ const sendTokenResponse = (user, statusCode, res) => {
 //@access   Public
 exports.register = async (req, res, next) => {
   try {
-    const { name, tel, email, password, role } = req.body;
+    const { name, tel, email, password } = req.body;
 
-    // Create user
+    // Create user with default role 'user' to prevent privilege escalation
     const user = await User.create({
       name,
       tel,
       email,
       password,
-      role,
+      role: 'user',
     });
 
     sendTokenResponse(user, 201, res);
