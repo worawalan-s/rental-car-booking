@@ -7,7 +7,7 @@ RESTful API backend for Rental Car Booking platform developed for Software Devel
 - **Framework**: Express.js
 - **Database**: MongoDB with Mongoose ODM
 - **Authentication**: JWT & Cookies, Bcryptjs password hashing
-- **Testing**: 
+- **Testing**: Jest & Supertest
 
 ---
 
@@ -63,3 +63,15 @@ Verify the server is running:
 ```bash
 curl http://localhost:5000/api/v1/health
 ```
+
+---
+
+## API Endpoints
+
+### Authentication (`/api/v1/auth`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/register` | Public | Register new user (`name`, `tel`, `email`, `password`). Server enforces `role: 'user'`. |
+| `POST` | `/api/v1/auth/login` | Public | Authenticate user with `email` and `password`, returns JWT token and cookie |
+| `POST` | `/api/v1/auth/logout` | Public | Clear authentication cookie |
+| `GET` | `/api/v1/auth/me` | Private | Retrieve current authenticated user profile |
