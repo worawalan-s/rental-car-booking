@@ -169,10 +169,10 @@ erDiagram
 ### 3.1 Authentication (`/api/v1/auth`)
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/auth/register` | Public | Register new user (`name`, `tel`, `email`, `password`, optional `role`) |
-| `POST` | `/api/v1/auth/login` | Public | Login with `email` and `password`, returns JWT token |
+| `POST` | `/api/v1/auth/register` | Public | Register new user (`name`, `tel`, `email`, `password`). Server enforces `role: 'user'` to prevent privilege escalation. |
+| `POST` | `/api/v1/auth/login` | Public | Login with `email` and `password`, returns JWT token and cookie |
 | `GET` | `/api/v1/auth/me` | Private | Get profile of logged-in user |
-| `GET` | `/api/v1/auth/logout` | Private | Clears authentication cookie |
+| `POST` | `/api/v1/auth/logout` | Public | Clears authentication cookie |
 
 ### 3.2 Cars Resource (`/api/v1/cars`)
 | Method | Endpoint | Access | Description |
@@ -210,7 +210,7 @@ When validation fails, endpoints respond with HTTP `400 Bad Request`:
 | **Schema** | `User.tel` | 10 digits Thai format (`^0[0-9]{9}$`), auto-trimmed | `"Please add a valid 10-digit Thai phone number (0xxxxxxxxx)"` |
 | **Schema** | `User.email` | RFC 5322 regex format, auto-trimmed, lowercased | `"Please add a valid email"` |
 | **Schema** | `User.password` | String, min length 6, hashed with bcrypt | `"Please add a password"` (min length 6) |
-| **Schema** | `User.role` | Enum: `['user', 'admin']` (default `'user'`) | Whitelist validation |
+| **Schema** | `User.role` | Enum: `['user', 'admin']` (enforced `'user'` on public registration) | Whitelist validation |
 | **Schema** | `Car.category` | Enum: `['Sedan', 'SUV', 'Hatchback', 'Van', 'Truck', 'Luxury', 'Electric']` | Whitelist validation |
 | **Schema** | `Car.dailyRate` | **Positive Integer in Satang** (`Number.isInteger`, `min: 1`) | `"Daily rate must be an integer in Satang (e.g. 150000)"` |
 | **Schema** | `Car.capacity` | Integer >= 1 (default 4) | `"Capacity must be at least 1 person"` |

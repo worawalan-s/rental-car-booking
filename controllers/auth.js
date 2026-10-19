@@ -5,11 +5,14 @@ const sendTokenResponse = (user, statusCode, res) => {
   // Create token
   const token = user.getSignedJwtToken();
 
+  const cookieExpireDays = Number(process.env.JWT_COOKIE_EXPIRE) || 30;
+
   const options = {
     expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
+      Date.now() + cookieExpireDays * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
+    sameSite: 'Lax',
   };
 
   if (process.env.NODE_ENV === 'production') {
@@ -30,20 +33,26 @@ const sendTokenResponse = (user, statusCode, res) => {
 //@access   Public
 exports.register = async (req, res, next) => {
   try {
-    const { name, tel, email, password, role } = req.body;
+    const { name, tel, email, password } = req.body;
 
-    // Create user
+    // Create user with default role 'user' to prevent privilege escalation
     const user = await User.create({
       name,
       tel,
       email,
       password,
-      role,
+      role: 'user',
     });
 
     sendTokenResponse(user, 201, res);
     
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already in use',
+      });
+    }
     res.status(400).json({
       success: false,
       message: err.message,
@@ -62,16 +71,16 @@ exports.login = async (req, res, next) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        msg: 'Please provide an email and password',
+        message: 'Please provide an email and password',
       });
     }
 
     // Check for user
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        msg: 'Invalid credentials',
+        message: 'Invalid credentials',
       });
     }
 
@@ -80,7 +89,7 @@ exports.login = async (req, res, next) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        msg: 'Invalid credentials',
+        message: 'Invalid credentials',
       });
     }
 
@@ -94,12 +103,13 @@ exports.login = async (req, res, next) => {
 };
 
 //@desc     Log user out / clear cookie
-//@route    GET /api/v1/auth/logout
+//@route    POST /api/v1/auth/logout
 //@access   Public
 exports.logout = async (req, res, next) => {
   res.cookie('token', 'none', {
     expires: new Date(Date.now() + 10 * 1000),
     httpOnly: true,
+    sameSite: 'Lax',
   });
 
   res.status(200).json({
@@ -113,7 +123,9 @@ exports.logout = async (req, res, next) => {
 //@access   Private
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).select(
+      '-password -resetPasswordToken -resetPasswordExpire'
+    );
 
     res.status(200).json({
       success: true,
