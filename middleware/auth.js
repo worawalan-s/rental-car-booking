@@ -5,9 +5,12 @@ const User = require('../models/User');
 exports.protect = async (req, res, next) => {
   let token;
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    // Set token from Bearer token in header
-    token = req.headers.authorization.split(' ')[1];
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && parts[1].trim().length > 0) {
+      token = parts[1].trim();
+    }
   } else if (req.cookies && req.cookies.token) {
     // Set token from cookie
     token = req.cookies.token;
@@ -36,6 +39,12 @@ exports.protect = async (req, res, next) => {
 
     next();
   } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token expired',
+      });
+    }
     return res.status(401).json({
       success: false,
       message: 'Not authorize to access this route',

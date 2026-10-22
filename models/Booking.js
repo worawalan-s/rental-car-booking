@@ -23,6 +23,13 @@ const BookingSchema = new mongoose.Schema({
   endDate: {
     type: Date,
     required: [true, 'Please specify the rental return date'],
+    validate: {
+      validator: function (value) {
+        if (!this.startDate || !value) return true;
+        return new Date(value) >= new Date(this.startDate);
+      },
+      message: 'Rental return date cannot be before start date',
+    },
   },
   numOfCars: {
     type: Number,

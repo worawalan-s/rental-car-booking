@@ -6,15 +6,24 @@ const UserSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Please add a name'],
+    trim: true,
+    maxlength: [50, 'Name cannot exceed 50 characters'],
   },
   tel: {
     type: String,
     required: [true, 'Please add a telephone number'],
+    trim: true,
+    match: [
+      /^0[0-9]{9}$/,
+      'Please add a valid 10-digit Thai phone number (0xxxxxxxxx)',
+    ],
   },
   email: {
     type: String,
     required: [true, 'Please add an email'],
     unique: true,
+    trim: true,
+    lowercase: true,
     match: [
       /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
       'Please add a valid email',
@@ -31,8 +40,14 @@ const UserSchema = new mongoose.Schema({
     minlength: 6,
     select: false,
   },
-  resetPasswordToken: String,
-  resetPasswordExpire: Date,
+  resetPasswordToken: {
+    type: String,
+    select: false,
+  },
+  resetPasswordExpire: {
+    type: Date,
+    select: false,
+  },
   driverLicense: {
     idNumber: { type: String, trim: true },
     imageUrl: { type: String, trim: true },
