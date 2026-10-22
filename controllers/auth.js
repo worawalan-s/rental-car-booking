@@ -35,11 +35,13 @@ exports.register = async (req, res, next) => {
   try {
     const { name, tel, email, password } = req.body;
 
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
+
     // Create user with default role 'user' to prevent privilege escalation
     const user = await User.create({
       name,
       tel,
-      email,
+      email: normalizedEmail,
       password,
       role: 'user',
     });
@@ -75,8 +77,10 @@ exports.login = async (req, res, next) => {
       });
     }
 
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
+
     // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -106,11 +110,17 @@ exports.login = async (req, res, next) => {
 //@route    POST /api/v1/auth/logout
 //@access   Public
 exports.logout = async (req, res, next) => {
-  res.cookie('token', 'none', {
+  const options = {
     expires: new Date(Date.now() + 10 * 1000),
     httpOnly: true,
     sameSite: 'Lax',
-  });
+  };
+
+  if (process.env.NODE_ENV === 'production') {
+    options.secure = true;
+  }
+
+  res.cookie('token', 'none', options);
 
   res.status(200).json({
     success: true,
