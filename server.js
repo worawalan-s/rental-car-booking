@@ -7,8 +7,13 @@ const connectDB = require('./config/db');
 dotenv.config({ path: './config/config.env' });
 
 // Verify critical environment variables
-if (process.env.NODE_ENV !== 'test' && !process.env.JWT_SECRET) {
-  console.error('FATAL ERROR: JWT_SECRET environment variable is not defined.');
+if (
+  process.env.NODE_ENV !== 'test' &&
+  (!process.env.JWT_SECRET || !process.env.JWT_EXPIRE)
+) {
+  console.error(
+    'FATAL ERROR: JWT_SECRET or JWT_EXPIRE environment variable is not defined.'
+  );
   process.exit(1);
 }
 

@@ -9,14 +9,28 @@ exports.getCars = async (req, res, next) => {
   try {
     let query;
 
-    // Copy req.query
-    const reqQuery = { ...req.query };
+    // Whitelist allowed filter fields matching Car schema
+    const ALLOWED_FILTER_FIELDS = [
+      'brand',
+      'model',
+      'category',
+      'dailyRate',
+      'capacity',
+      'isAvailable',
+      'provider',
+    ];
 
-    // Fields to exclude from filtering
-    const removeFields = ['select', 'sort', 'page', 'limit'];
-
-    // Loop over removeFields and delete them from reqQuery
-    removeFields.forEach((param) => delete reqQuery[param]);
+    // Filter req.query: reject non-whitelisted keys and keys starting with $ or __proto__
+    const reqQuery = {};
+    for (const [key, value] of Object.entries(req.query)) {
+      if (
+        !key.startsWith('$') &&
+        key !== '__proto__' &&
+        ALLOWED_FILTER_FIELDS.includes(key)
+      ) {
+        reqQuery[key] = value;
+      }
+    }
 
     // Create query string
     let queryStr = JSON.stringify(reqQuery);
@@ -27,8 +41,10 @@ exports.getCars = async (req, res, next) => {
       (match) => `$${match}`
     );
 
+    const parsedQuery = JSON.parse(queryStr);
+
     // Finding resource with populated provider and virtual bookings (Assignment 7.2 pattern)
-    query = Car.find(JSON.parse(queryStr))
+    query = Car.find(parsedQuery)
       .populate({
         path: 'provider',
         select: 'name address tel',
@@ -36,25 +52,26 @@ exports.getCars = async (req, res, next) => {
       .populate('bookings');
 
     // Select Fields
-    if (req.query.select) {
+    if (req.query.select && typeof req.query.select === 'string') {
       const fields = req.query.select.split(',').join(' ');
       query = query.select(fields);
     }
 
     // Sort
-    if (req.query.sort) {
+    if (req.query.sort && typeof req.query.sort === 'string') {
       const sortBy = req.query.sort.split(',').join(' ');
       query = query.sort(sortBy);
     } else {
       query = query.sort('-createdAt');
     }
 
-    // Pagination
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 25;
+    // Pagination with safe boundaries (cap limit between 1 and 50)
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const rawLimit = parseInt(req.query.limit, 10) || 25;
+    const limit = Math.min(Math.max(rawLimit, 1), 50);
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
-    const total = await Car.countDocuments(JSON.parse(queryStr));
+    const total = await Car.countDocuments(parsedQuery);
 
     query = query.skip(startIndex).limit(limit);
 

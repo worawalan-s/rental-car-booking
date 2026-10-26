@@ -20,7 +20,7 @@ exports.protect = async (req, res, next) => {
   if (!token || token === 'none') {
     return res.status(401).json({
       success: false,
-      message: 'Not authorize to access this route',
+      message: 'Not authorized to access this route',
     });
   }
 
@@ -33,7 +33,7 @@ exports.protect = async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: 'Not authorize to access this route',
+        message: 'Not authorized to access this route',
       });
     }
 
@@ -47,7 +47,7 @@ exports.protect = async (req, res, next) => {
     }
     return res.status(401).json({
       success: false,
-      message: 'Not authorize to access this route',
+      message: 'Not authorized to access this route',
     });
   }
 };
