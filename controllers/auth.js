@@ -55,9 +55,16 @@ exports.register = async (req, res, next) => {
         message: 'Email already in use',
       });
     }
-    res.status(400).json({
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    console.error(err.stack);
+    res.status(500).json({
       success: false,
-      message: err.message,
+      message: 'Server error',
     });
   }
 };
@@ -104,9 +111,16 @@ exports.login = async (req, res, next) => {
 
     sendTokenResponse(user, 200, res);
   } catch (err) {
-    res.status(400).json({
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    console.error(err.stack);
+    res.status(500).json({
       success: false,
-      message: err.message,
+      message: 'Server error',
     });
   }
 };
@@ -137,19 +151,8 @@ exports.logout = async (req, res, next) => {
 //@route    GET /api/v1/auth/me
 //@access   Private
 exports.getMe = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.id).select(
-      '-password -resetPasswordToken -resetPasswordExpire'
-    );
-
-    res.status(200).json({
-      success: true,
-      data: user,
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-    });
-  }
+  res.status(200).json({
+    success: true,
+    data: req.user,
+  });
 };
