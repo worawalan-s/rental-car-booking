@@ -6,10 +6,17 @@ const UserSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Please add a name'],
+    trim: true,
+    maxlength: [50, 'Name cannot exceed 50 characters'],
   },
   tel: {
     type: String,
     required: [true, 'Please add a telephone number'],
+    trim: true,
+    match: [
+      /^0[0-9]{9}$/,
+      'Please add a valid 10-digit Thai phone number (0xxxxxxxxx)',
+    ],
   },
   email: {
     type: String,

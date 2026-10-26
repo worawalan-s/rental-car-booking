@@ -25,7 +25,11 @@ const CarSchema = new mongoose.Schema(
     dailyRate: {
       type: Number,
       required: [true, 'Please add a daily rental rate'],
-      min: [0, 'Daily rate cannot be negative'],
+      min: [1, 'Daily rate must be at least 1 Satang'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'Daily rate must be an integer in Satang (e.g. 150000)',
+      },
       // Stored as an Integer in Satang (cents) to guarantee Fixed-point arithmetic precision (Req 3)
       // Example: 150000 = 1,500.00 THB
     },
