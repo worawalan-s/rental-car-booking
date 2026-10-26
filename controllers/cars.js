@@ -7,6 +7,8 @@ const Booking = require('../models/Booking');
 // @access    Public
 exports.getCars = async (req, res, next) => {
   try {
+    let query;
+
     // Whitelist allowed filter fields matching Car schema
     const ALLOWED_FILTER_FIELDS = [
       'brand',
