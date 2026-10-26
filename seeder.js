@@ -38,6 +38,12 @@ const bookings = JSON.parse(
 
 // Import all data into database with dynamic relational linking
 const importData = async () => {
+  // Safety guard: prevent accidental data wipe or seed in production
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL ERROR: Cannot wipe or seed database in production mode!');
+    process.exit(1);
+  }
+
   try {
     await connectDB();
 
@@ -87,16 +93,26 @@ const importData = async () => {
     const createdBookings = await Booking.create(bookingsWithRefs);
     console.log(`✓ ${createdBookings.length} Bookings imported`);
 
+    await mongoose.connection.close();
     console.log('\x1b[32m%s\x1b[0m', '✅ Database Seeding Completed Successfully!');
     process.exit(0);
   } catch (err) {
     console.error('❌ Data Import Failed:', err.message);
+    try {
+      await mongoose.connection.close();
+    } catch (_) {}
     process.exit(1);
   }
 };
 
 // Delete all data across collections
 const destroyData = async () => {
+  // Safety guard: prevent accidental data wipe in production
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL ERROR: Cannot wipe or seed database in production mode!');
+    process.exit(1);
+  }
+
   try {
     await connectDB();
 
@@ -105,10 +121,14 @@ const destroyData = async () => {
     await Provider.deleteMany();
     await User.deleteMany();
 
+    await mongoose.connection.close();
     console.log('\x1b[31m%s\x1b[0m', '🗑️ All database collections wiped successfully!');
     process.exit(0);
   } catch (err) {
     console.error('❌ Data Destroy Failed:', err.message);
+    try {
+      await mongoose.connection.close();
+    } catch (_) {}
     process.exit(1);
   }
 };
