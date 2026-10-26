@@ -69,3 +69,31 @@ Verify the server is running:
 ```bash
 curl http://localhost:5000/api/v1/health
 ```
+
+---
+
+## Database Seeding & Mock Data
+
+A standalone database seeder utility (`seeder.js`) and realistic mock datasets (`_data/`) are provided to populate the database with providers, cars across all 7 categories, sample reservations, and pre-configured test accounts.
+
+### 1. Seeding Commands
+```bash
+# Import mock dataset into MongoDB
+npm run seed
+
+# Wipe all collections from MongoDB
+npm run seed:destroy
+```
+*(Alternatively: `node seeder.js -i` or `node seeder.js -d`)*
+
+### 2. Seeded Test Accounts
+| Role | Email | Password | Telephone | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Admin** | `admin@rentalcar.com` | `adminpassword` | `0812345678` | Primary administrator with full RBAC access |
+| **Admin** | `manager@rentalcar.com` | `managerpassword` | `0898765432` | Secondary administrator for management tasks |
+| **User** | `john.doe@example.com` | `userpassword` | `0823456789` | Regular customer account |
+| **User** | `jane.smith@example.com` | `userpassword` | `0834567890` | Regular customer account |
+| **User** | `alice.johnson@example.com` | `userpassword` | `0845678901` | Regular customer account |
+
+> [!NOTE]
+> Each user account is individually hashed with a unique cryptographic salt upon seeding, guaranteeing password security and avoiding hash collisions.
