@@ -69,15 +69,20 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // Validate email & password
-    if (!email || !password) {
+    // Validate email & password types and presence
+    if (
+      !email ||
+      !password ||
+      typeof email !== 'string' ||
+      typeof password !== 'string'
+    ) {
       return res.status(400).json({
         success: false,
         message: 'Please provide an email and password',
       });
     }
 
-    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Check for user
     const user = await User.findOne({ email: normalizedEmail }).select('+password');
