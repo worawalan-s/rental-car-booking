@@ -1,0 +1,114 @@
+[
+  {
+    "brand": "Toyota",
+    "model": "Camry 2.5 Premium",
+    "category": "Sedan",
+    "dailyRate": 150000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "Honda",
+    "model": "Civic RS e:HEV",
+    "category": "Sedan",
+    "dailyRate": 120000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "Honda",
+    "model": "CR-V e:HEV RS",
+    "category": "SUV",
+    "dailyRate": 200000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "Toyota",
+    "model": "Fortuner 2.8 Legender",
+    "category": "SUV",
+    "dailyRate": 220000,
+    "capacity": 7,
+    "isAvailable": true
+  },
+  {
+    "brand": "Toyota",
+    "model": "Yaris Cross Smart",
+    "category": "Hatchback",
+    "dailyRate": 90000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "Honda",
+    "model": "City Hatchback RS",
+    "category": "Hatchback",
+    "dailyRate": 95000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "Toyota",
+    "model": "Commuter 2.8 D4D",
+    "category": "Van",
+    "dailyRate": 250000,
+    "capacity": 12,
+    "isAvailable": true
+  },
+  {
+    "brand": "Hyundai",
+    "model": "Staria Premium 2.2",
+    "category": "Van",
+    "dailyRate": 320000,
+    "capacity": 11,
+    "isAvailable": true
+  },
+  {
+    "brand": "Toyota",
+    "model": "Hilux Revo Double Cab 2.8",
+    "category": "Truck",
+    "dailyRate": 140000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "Isuzu",
+    "model": "D-Max V-Cross 4x4",
+    "category": "Truck",
+    "dailyRate": 135000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "Mercedes-Benz",
+    "model": "E 220 d AMG Line",
+    "category": "Luxury",
+    "dailyRate": 450000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "BMW",
+    "model": "530e M Sport",
+    "category": "Luxury",
+    "dailyRate": 480000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "Tesla",
+    "model": "Model 3 Long Range",
+    "category": "Electric",
+    "dailyRate": 280000,
+    "capacity": 5,
+    "isAvailable": true
+  },
+  {
+    "brand": "BYD",
+    "model": "Atto 3 Extended Range",
+    "category": "Electric",
+    "dailyRate": 160000,
+    "capacity": 5,
+    "isAvailable": true
+  }
+]
