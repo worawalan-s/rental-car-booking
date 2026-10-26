@@ -41,6 +41,11 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     select: false,
   },
+  driverLicense: {
+    idNumber: { type: String, trim: true },
+    imageUrl: { type: String, trim: true },
+    verified: { type: Boolean, default: false },
+  },
   createdAt: {
     type: Date,
     default: Date.now,

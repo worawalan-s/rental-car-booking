@@ -19,16 +19,22 @@ rental-car-booking/
 │   ├── config.env            # Environment variables (ignored by git)
 │   └── db.js                 # MongoDB connection logic
 ├── controllers/              # Request handlers
+├── docs/
+│   └── API_CONTRACTS.md      # Data models & API contracts specification
 ├── middleware/               # Auth & validation middleware
 ├── models/                   # Mongoose schemas
 ├── routes/                   # Express routes
 ├── utils/                    # Helper functions & pricing engines
-├── __tests__/                # Automated tests
 ├── .gitignore
 ├── package.json
 ├── README.md
 └── server.js                 # Entry point
 ```
+
+---
+
+## Documentation & Contracts
+- **[API Contracts & Data Models Reference](docs/API_CONTRACTS.md)**: Comprehensive schema definitions, currency format (Satang), and endpoint contracts for team collaboration.
 
 ---
 
