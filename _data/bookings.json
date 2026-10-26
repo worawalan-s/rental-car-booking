@@ -5,18 +5,7 @@
     "numOfCars": 1,
     "totalPrice": 450000,
     "status": "Confirmed",
-    "addOns": [
-      {
-        "addOn": "GPS Navigation",
-        "quantity": 1,
-        "price": 30000
-      },
-      {
-        "addOn": "Child Safety Seat",
-        "quantity": 1,
-        "price": 20000
-      }
-    ]
+    "addOns": []
   },
   {
     "startDate": "2026-11-15T10:00:00.000Z",
@@ -24,13 +13,7 @@
     "numOfCars": 2,
     "totalPrice": 720000,
     "status": "Pending",
-    "addOns": [
-      {
-        "addOn": "Comprehensive Insurance",
-        "quantity": 2,
-        "price": 50000
-      }
-    ]
+    "addOns": []
   },
   {
     "startDate": "2026-11-20T08:00:00.000Z",
