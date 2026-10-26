@@ -6,6 +6,17 @@ const connectDB = require('./config/db');
 // Load env vars
 dotenv.config({ path: './config/config.env' });
 
+// Verify critical environment variables
+if (
+  process.env.NODE_ENV !== 'test' &&
+  (!process.env.JWT_SECRET || !process.env.JWT_EXPIRE)
+) {
+  console.error(
+    'FATAL ERROR: JWT_SECRET or JWT_EXPIRE environment variable is not defined.'
+  );
+  process.exit(1);
+}
+
 // Connect to database
 connectDB();
 
@@ -20,6 +31,9 @@ app.use(cookieParser());
 // Query parser
 app.set('query parser', 'extended');
 
+// Route files
+const auth = require('./routes/auth');
+
 // Base health check
 app.get('/api/v1/health', (req, res) => {
   res.status(200).json({
@@ -27,6 +41,9 @@ app.get('/api/v1/health', (req, res) => {
     message: 'Rental Car Booking API is running',
   });
 });
+
+// Mount routers
+app.use('/api/v1/auth', auth);
 
 const PORT = process.env.PORT || 5000;
 
