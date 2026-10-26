@@ -1,0 +1,37 @@
+[
+  {
+    "name": "System Administrator",
+    "tel": "0812345678",
+    "email": "admin@rentalcar.com",
+    "role": "admin",
+    "password": "adminpassword"
+  },
+  {
+    "name": "Manager Staff",
+    "tel": "0898765432",
+    "email": "manager@rentalcar.com",
+    "role": "admin",
+    "password": "managerpassword"
+  },
+  {
+    "name": "John Doe",
+    "tel": "0823456789",
+    "email": "john.doe@example.com",
+    "role": "user",
+    "password": "userpassword"
+  },
+  {
+    "name": "Jane Smith",
+    "tel": "0834567890",
+    "email": "jane.smith@example.com",
+    "role": "user",
+    "password": "userpassword"
+  },
+  {
+    "name": "Alice Johnson",
+    "tel": "0845678901",
+    "email": "alice.johnson@example.com",
+    "role": "user",
+    "password": "userpassword"
+  }
+]

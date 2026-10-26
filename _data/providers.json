@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Siam Car Rental",
+    "address": "3850 Rama 4 Rd, Phra Khanong, Khlong Toei, Bangkok 10110",
+    "tel": "023487000"
+  },
+  {
+    "name": "Lanna Drive Chiang Mai",
+    "address": "99/1 Moo 2, Chiang Mai-Hang Dong Rd, Pa Daet, Mueang Chiang Mai, Chiang Mai 50100",
+    "tel": "053248100"
+  },
+  {
+    "name": "Andaman Wheels Phuket",
+    "address": "211/2 Thepkrasattri Rd, Thep Krasatti, Thalang, Phuket 83110",
+    "tel": "076390111"
+  },
+  {
+    "name": "Eastern Coast Mobility Pattaya",
+    "address": "268/1 Moo 9, Sukhumvit Rd, Nong Prue, Bang Lamung, Chonburi 20150",
+    "tel": "038429100"
+  }
+]
