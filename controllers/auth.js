@@ -5,11 +5,14 @@ const sendTokenResponse = (user, statusCode, res) => {
   // Create token
   const token = user.getSignedJwtToken();
 
+  const cookieExpireDays = Number(process.env.JWT_COOKIE_EXPIRE) || 30;
+
   const options = {
     expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
+      Date.now() + cookieExpireDays * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
+    sameSite: 'Lax',
   };
 
   if (process.env.NODE_ENV === 'production') {
@@ -30,23 +33,38 @@ const sendTokenResponse = (user, statusCode, res) => {
 //@access   Public
 exports.register = async (req, res, next) => {
   try {
-    const { name, tel, email, password, role } = req.body;
+    const { name, tel, email, password } = req.body;
 
-    // Create user
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
+
+    // Create user with default role 'user' to prevent privilege escalation
     const user = await User.create({
       name,
       tel,
-      email,
+      email: normalizedEmail,
       password,
-      role,
+      role: 'user',
     });
 
     sendTokenResponse(user, 201, res);
     
   } catch (err) {
-    res.status(400).json({
+    if (err.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already in use',
+      });
+    }
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    console.error(err.stack);
+    res.status(500).json({
       success: false,
-      message: err.message,
+      message: 'Server error',
     });
   }
 };
@@ -58,20 +76,27 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // Validate email & password
-    if (!email || !password) {
+    // Validate email & password types and presence
+    if (
+      !email ||
+      !password ||
+      typeof email !== 'string' ||
+      typeof password !== 'string'
+    ) {
       return res.status(400).json({
         success: false,
-        msg: 'Please provide an email and password',
+        message: 'Please provide an email and password',
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
     if (!user) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        msg: 'Invalid credentials',
+        message: 'Invalid credentials',
       });
     }
 
@@ -80,27 +105,41 @@ exports.login = async (req, res, next) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        msg: 'Invalid credentials',
+        message: 'Invalid credentials',
       });
     }
 
     sendTokenResponse(user, 200, res);
   } catch (err) {
-    res.status(400).json({
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    console.error(err.stack);
+    res.status(500).json({
       success: false,
-      message: err.message,
+      message: 'Server error',
     });
   }
 };
 
 //@desc     Log user out / clear cookie
-//@route    GET /api/v1/auth/logout
+//@route    POST /api/v1/auth/logout
 //@access   Public
 exports.logout = async (req, res, next) => {
-  res.cookie('token', 'none', {
+  const options = {
     expires: new Date(Date.now() + 10 * 1000),
     httpOnly: true,
-  });
+    sameSite: 'Lax',
+  };
+
+  if (process.env.NODE_ENV === 'production') {
+    options.secure = true;
+  }
+
+  res.cookie('token', 'none', options);
 
   res.status(200).json({
     success: true,
@@ -112,17 +151,8 @@ exports.logout = async (req, res, next) => {
 //@route    GET /api/v1/auth/me
 //@access   Private
 exports.getMe = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.id);
-
-    res.status(200).json({
-      success: true,
-      data: user,
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-    });
-  }
+  res.status(200).json({
+    success: true,
+    data: req.user,
+  });
 };
