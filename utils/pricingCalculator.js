@@ -22,7 +22,8 @@ const calculateBaselinePrice = ({
   const rentalBase = durationDays * dailyRate * numOfCars;
   const addOnsTotal = Array.isArray(addOns)
     ? addOns.reduce(
-        (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
+        (sum, item) =>
+          sum + (item.price || 0) * (item.quantity || 1) * durationDays,
         0
       )
     : 0;

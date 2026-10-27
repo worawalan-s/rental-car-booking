@@ -97,6 +97,7 @@ const validateBookingDates = (req, res, next) => {
     });
   }
 
+  req.durationDays = durationDays;
   next();
 };
 

@@ -8,6 +8,6 @@ const router = express.Router();
 
 router
   .route('/')
-  .post(protect, authorize('user', 'admin'), validateBookingPayload, createBooking);
+  .post(protect, authorize('user'), validateBookingPayload, createBooking);
 
 module.exports = router;
