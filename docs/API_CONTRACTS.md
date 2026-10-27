@@ -183,6 +183,11 @@ erDiagram
 | `PUT` | `/api/v1/cars/:id` | Private (Admin) | Update car attributes with schema validators |
 | `DELETE` | `/api/v1/cars/:id` | Private (Admin) | Delete car with **cascading delete** of associated bookings |
 
+### 3.3 Bookings Resource (`/api/v1/bookings`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/bookings` | Private (User/Admin) | Create vehicle reservation. Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for standard users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$. Exceeding quota returns HTTP 400 (`User with ID <id> has already reached the maximum quota of 3 bookings`). Admins are quota-exempt. Validates car existence and availability, auto-assigns `provider = car.provider`, and calculates baseline `totalPrice = durationDays * dailyRate * numOfCars` in integer Satang. Strictly enforces two-key error responses. |
+
 ---
 
 ## 4. Input & Business Validation (Hybrid Architecture)
