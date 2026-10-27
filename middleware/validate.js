@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { calculateDurationDays } = require('../utils/date');
 
 // Helper validators
 const isValidObjectId = (id) => mongoose.isValidObjectId(id);
@@ -88,7 +89,7 @@ const validateBookingDates = (req, res, next) => {
     });
   }
 
-  const durationDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+  const durationDays = calculateDurationDays(start, end);
   if (durationDays > 30) {
     return res.status(400).json({
       success: false,

@@ -1,5 +1,7 @@
 const Booking = require('../models/Booking');
 const Car = require('../models/Car');
+const { calculateDurationDays } = require('../utils/date');
+const { calculateBaselinePrice } = require('../utils/pricingCalculator');
 
 /**
  * @desc    Create new booking
@@ -58,19 +60,31 @@ exports.createBooking = async (req, res) => {
       if (activeCarsSum + requestedCars > 3) {
         return res.status(400).json({
           success: false,
-          message: `User with ID ${req.user.id} has already reached the maximum quota of 3 bookings`,
+          message: `User with ID ${req.user.id} has already reached the maximum quota of 3 cars`,
         });
       }
     }
 
-    // 6. Calculate Baseline totalPrice in Satang (durationDays * dailyRate * numOfCars)
-    const start = new Date(req.body.startDate);
-    const end = new Date(req.body.endDate);
-    const durationDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-    const numOfCars = req.body.numOfCars || 1;
-    req.body.totalPrice = durationDays * car.dailyRate * numOfCars;
+    // 6. Explicit status enforcement: default to 'Pending'; only admin can initialize as 'Confirmed'
+    let bookingStatus = 'Pending';
+    if (req.body.status && ['Pending', 'Confirmed'].includes(req.body.status)) {
+      if (req.user.role === 'admin' || req.body.status === 'Pending') {
+        bookingStatus = req.body.status;
+      }
+    }
+    req.body.status = bookingStatus;
 
-    // 7. Create booking document
+    // 7. Calculate Baseline totalPrice in Satang ((dailyRate * durationDays * numOfCars) + addOnsTotal)
+    const durationDays = calculateDurationDays(req.body.startDate, req.body.endDate);
+    const numOfCars = req.body.numOfCars || 1;
+    req.body.totalPrice = calculateBaselinePrice({
+      dailyRate: car.dailyRate,
+      durationDays,
+      numOfCars,
+      addOns: req.body.addOns,
+    });
+
+    // 8. Create booking document
     const booking = await Booking.create(req.body);
 
     res.status(201).json({
@@ -78,6 +92,14 @@ exports.createBooking = async (req, res) => {
       data: booking,
     });
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      const message = Object.values(err.errors).map((val) => val.message).join(', ');
+      return res.status(400).json({
+        success: false,
+        message,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Cannot create Booking',
