@@ -186,7 +186,7 @@ erDiagram
 ### 3.3 Bookings Resource (`/api/v1/bookings`)
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/bookings` | Private (User/Admin) | Create vehicle reservation. Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for standard users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$. Exceeding quota returns HTTP 400 (`User with ID <id> has already reached the maximum quota of 3 bookings`). Admins are quota-exempt. Validates car existence and availability, auto-assigns `provider = car.provider`, and calculates baseline `totalPrice = durationDays * dailyRate * numOfCars` in integer Satang. Strictly enforces two-key error responses. |
+| `POST` | `/api/v1/bookings` | Private (User/Admin) | Create vehicle reservation. Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for standard users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$. Exceeding quota returns HTTP 400 (`User with ID <id> has already reached the maximum quota of 3 cars`). Admins are quota-exempt. Validates car existence and availability, auto-assigns `provider = car.provider`, enforces explicit initial status (`'Pending'`; only admins can initialize as `'Confirmed'`), and calculates baseline `totalPrice = (dailyRate * durationDays * numOfCars) + addOnsTotal` in integer Satang via `utils/pricingCalculator.js`. Validation failures return HTTP 400 Bad Request while server errors return HTTP 500 (`Cannot create Booking`). Strictly enforces two-key error responses. |
 
 ---
 
