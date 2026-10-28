@@ -138,7 +138,11 @@ erDiagram
 | `createdAt` | `Date` | Default: `Date.now` | |
 | *`bookings`* | *Virtual* | Reverse populate | `ref: 'Booking', localField: '_id', foreignField: 'car'` |
 
-- **Compound Index**: `{ provider: 1, category: 1, isAvailable: 1 }` (Enables sub-200ms real-time category filtering).
+- **Compound Indexes**:
+  - `{ provider: 1, category: 1, isAvailable: 1 }` (Provider catalog sub-200ms real-time category filtering)
+  - `{ isAvailable: 1, category: 1 }` (Global search real-time category aggregation with proper prefix)
+  - `{ isAvailable: 1, dailyRate: 1 }` (Availability and price range sorting/filtering)
+  - `{ brand: 1, model: 1 }` (Keyword search indexing preventing COLLSCAN)
 
 ---
 
@@ -178,7 +182,7 @@ erDiagram
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/cars` | Public | List cars with filtering (`?category=Sedan`), sorting (`?sort=dailyRate`), pagination (`?page=1&limit=10`), and populated `provider` + `bookings` |
-| `GET` | `/api/v1/cars/search` | Public | High-performance search and aggregation pipeline (Adv Req 2). Returns paginated vehicle results and dynamic real-time counts across all 7 vehicle categories (`Sedan`, `SUV`, `Hatchback`, `Van`, `Truck`, `Luxury`, `Electric`) in under 200ms using MongoDB `$facet` supported by compound indexes `{ provider: 1, category: 1, isAvailable: 1 }`, `{ category: 1, isAvailable: 1 }`, and `{ isAvailable: 1, dailyRate: 1 }`. Supports keyword text search (`?keyword=` on brand/model), category filters (`?category=`), scalar and range operator filters on `dailyRate` (in Satang) and `capacity`, provider scoping (`?provider=`), and dynamic sorting (`?sort=`, defaults to `-createdAt`). Returns clean standard response envelope `{ success: true, count, total, pagination, categoryCounts, data }` with zero diagnostics leakage; failures strictly follow two-key `{ success: false, message }` format. |
+| `GET` | `/api/v1/cars/search` | Public | High-performance search and aggregation pipeline (Adv Req 2). Returns paginated vehicle results and dynamic real-time counts across all 7 vehicle categories (`Sedan`, `SUV`, `Hatchback`, `Van`, `Truck`, `Luxury`, `Electric`) in under 200ms using MongoDB `$facet` supported by compound indexes `{ provider: 1, category: 1, isAvailable: 1 }`, `{ isAvailable: 1, category: 1 }`, `{ isAvailable: 1, dailyRate: 1 }`, and `{ brand: 1, model: 1 }`. Category counts dynamically reflect active search filters (faceted search). Supports safe escaped keyword text search (`?keyword=` on brand/model), category filters (`?category=`), scalar and range operator filters on `dailyRate` (in Satang) and `capacity`, provider scoping (`?provider=`), and dynamic sorting (`?sort=`, defaults to `-createdAt`). Returns clean standard response envelope `{ success: true, count, total, pagination, categoryCounts, data }` with zero diagnostics leakage; failures strictly follow two-key `{ success: false, message }` format. |
 | `GET` | `/api/v1/cars/:id` | Public | Get single car with populated `provider` and virtual `bookings` |
 | `POST` | `/api/v1/cars` | Private (Admin) | Create new car with schema-enforced validations and Satang rate |
 | `PUT` | `/api/v1/cars/:id` | Private (Admin) | Update car attributes with schema validators |
