@@ -5,6 +5,7 @@ const {
   createCar,
   updateCar,
   deleteCar,
+  searchCars,
 } = require('../controllers/cars');
 
 const { protect, authorize } = require('../middleware/auth');
@@ -15,6 +16,8 @@ router
   .route('/')
   .get(getCars)
   .post(protect, authorize('admin'), createCar);
+
+router.route('/search').get(searchCars);
 
 router
   .route('/:id')
