@@ -178,6 +178,7 @@ erDiagram
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/cars` | Public | List cars with filtering (`?category=Sedan`), sorting (`?sort=dailyRate`), pagination (`?page=1&limit=10`), and populated `provider` + `bookings` |
+| `GET` | `/api/v1/cars/search` | Public | High-performance search and aggregation pipeline (Adv Req 2). Returns paginated vehicle results and dynamic real-time counts across all 7 vehicle categories (`Sedan`, `SUV`, `Hatchback`, `Van`, `Truck`, `Luxury`, `Electric`) in under 200ms using MongoDB `$facet` and index `{ provider: 1, category: 1, isAvailable: 1 }`. Scopes category counts when filtered by `?provider=<id>`. |
 | `GET` | `/api/v1/cars/:id` | Public | Get single car with populated `provider` and virtual `bookings` |
 | `POST` | `/api/v1/cars` | Private (Admin) | Create new car with schema-enforced validations and Satang rate |
 | `PUT` | `/api/v1/cars/:id` | Private (Admin) | Update car attributes with schema validators |
