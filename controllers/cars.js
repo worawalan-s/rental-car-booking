@@ -229,7 +229,6 @@ exports.deleteCar = async (req, res, next) => {
 // @route     GET /api/v1/cars/search
 // @access    Public
 exports.searchCars = async (req, res, next) => {
-  const startTime = Date.now();
   try {
     // 1. Build sanitized match query for vehicles
     const matchQuery = {};
@@ -264,8 +263,21 @@ exports.searchCars = async (req, res, next) => {
       }
     }
 
-    // Filter by capacity ($gte or exact)
-    if (req.query.capacity) {
+    // Search by keyword across brand and model (case-insensitive regex)
+    if (req.query.keyword && typeof req.query.keyword === 'string') {
+      const keywordRegex = new RegExp(req.query.keyword.trim(), 'i');
+      matchQuery.$or = [{ brand: keywordRegex }, { model: keywordRegex }];
+    } else {
+      if (req.query.brand && typeof req.query.brand === 'string') {
+        matchQuery.brand = new RegExp(req.query.brand.trim(), 'i');
+      }
+      if (req.query.model && typeof req.query.model === 'string') {
+        matchQuery.model = new RegExp(req.query.model.trim(), 'i');
+      }
+    }
+
+    // Filter by capacity (supports both exact scalar and operator ranges)
+    if (req.query.capacity !== undefined) {
       if (typeof req.query.capacity === 'object') {
         const capFilter = {};
         for (const [op, val] of Object.entries(req.query.capacity)) {
@@ -275,19 +287,23 @@ exports.searchCars = async (req, res, next) => {
         }
         if (Object.keys(capFilter).length > 0) matchQuery.capacity = capFilter;
       } else {
-        matchQuery.capacity = { $gte: parseInt(req.query.capacity, 10) };
+        matchQuery.capacity = parseInt(req.query.capacity, 10);
       }
     }
 
-    // Filter by dailyRate in Satang (fixed-point integer)
-    if (req.query.dailyRate && typeof req.query.dailyRate === 'object') {
-      const rateFilter = {};
-      for (const [op, val] of Object.entries(req.query.dailyRate)) {
-        if (['gt', 'gte', 'lt', 'lte'].includes(op)) {
-          rateFilter[`$${op}`] = parseInt(val, 10);
+    // Filter by dailyRate in Satang (supports both exact scalar and operator ranges)
+    if (req.query.dailyRate !== undefined) {
+      if (typeof req.query.dailyRate === 'object') {
+        const rateFilter = {};
+        for (const [op, val] of Object.entries(req.query.dailyRate)) {
+          if (['gt', 'gte', 'lt', 'lte'].includes(op)) {
+            rateFilter[`$${op}`] = parseInt(val, 10);
+          }
         }
+        if (Object.keys(rateFilter).length > 0) matchQuery.dailyRate = rateFilter;
+      } else {
+        matchQuery.dailyRate = parseInt(req.query.dailyRate, 10);
       }
-      if (Object.keys(rateFilter).length > 0) matchQuery.dailyRate = rateFilter;
     }
 
     // Pagination parameters
@@ -295,6 +311,23 @@ exports.searchCars = async (req, res, next) => {
     const rawLimit = parseInt(req.query.limit, 10) || 25;
     const limit = Math.min(Math.max(rawLimit, 1), 50);
     const skip = (page - 1) * limit;
+
+    // Sorting parameters (defaults to createdAt descending, latest first)
+    const sortStage = {};
+    if (req.query.sort && typeof req.query.sort === 'string') {
+      const sortFields = req.query.sort.split(',');
+      sortFields.forEach((field) => {
+        const trimmed = field.trim();
+        if (trimmed.startsWith('-')) {
+          sortStage[trimmed.substring(1)] = -1;
+        } else {
+          sortStage[trimmed] = 1;
+        }
+      });
+    } else {
+      sortStage.createdAt = -1;
+    }
+    sortStage._id = 1;
 
     // Build category count match stage:
     // When searching within a provider, categoryCounts reflect available cars for that provider.
@@ -309,7 +342,7 @@ exports.searchCars = async (req, res, next) => {
         $facet: {
           paginatedResults: [
             { $match: matchQuery },
-            { $sort: { dailyRate: 1, _id: 1 } },
+            { $sort: sortStage },
             { $skip: skip },
             { $limit: limit },
             {
@@ -368,19 +401,10 @@ exports.searchCars = async (req, res, next) => {
         result.totalCount[0].total) ||
       0;
 
-    // Standardize categoryCounts map across all 7 valid categories
-    const ALL_CATEGORIES = [
-      'Sedan',
-      'SUV',
-      'Hatchback',
-      'Van',
-      'Truck',
-      'Luxury',
-      'Electric',
-    ];
-
+    // Dynamically retrieve schema category enum values
     const categoryCountsMap = {};
-    ALL_CATEGORIES.forEach((cat) => {
+    const schemaCategories = Car.schema.path('category').enumValues || [];
+    schemaCategories.forEach((cat) => {
       categoryCountsMap[cat] = 0;
     });
 
@@ -407,22 +431,20 @@ exports.searchCars = async (req, res, next) => {
       };
     }
 
-    const executionTimeMs = Date.now() - startTime;
-
+    // Strict Standard Response Envelope (No diagnostics leakage)
     res.status(200).json({
       success: true,
       count: cars.length,
       total,
       pagination,
       categoryCounts: categoryCountsMap,
-      executionTimeMs,
       data: cars,
     });
   } catch (err) {
+    // Strict Two-Key Error Envelope
     res.status(500).json({
       success: false,
-      message: 'Server error during car search and aggregation',
-      error: err.message,
+      message: 'Cannot search cars',
     });
   }
 };
