@@ -61,8 +61,9 @@ const CarSchema = new mongoose.Schema(
 
 // Compound Indexes for sub-200ms category filtering and search optimization (Adv Req 2)
 CarSchema.index({ provider: 1, category: 1, isAvailable: 1 });
-CarSchema.index({ category: 1, isAvailable: 1 });
+CarSchema.index({ isAvailable: 1, category: 1 });
 CarSchema.index({ isAvailable: 1, dailyRate: 1 });
+CarSchema.index({ brand: 1, model: 1 });
 
 // Reverse populate with virtuals for bookings
 CarSchema.virtual('bookings', {
