@@ -225,20 +225,33 @@ exports.deleteCar = async (req, res, next) => {
   }
 };
 
+// Helper to escape regex special characters
+const escapeRegex = (text) =>
+  text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+
+// Helper to parse numeric filters (supports both exact scalar and operator objects)
+const parseNumericFilter = (param) => {
+  if (param === undefined || param === null) return undefined;
+  if (typeof param === 'object') {
+    const filter = {};
+    for (const [op, val] of Object.entries(param)) {
+      if (['gt', 'gte', 'lt', 'lte'].includes(op)) {
+        filter[`$${op}`] = parseInt(val, 10);
+      }
+    }
+    return Object.keys(filter).length > 0 ? filter : undefined;
+  }
+  const parsed = parseInt(param, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
 // @desc      Search cars with real-time category aggregation pipeline (<200ms)
 // @route     GET /api/v1/cars/search
 // @access    Public
 exports.searchCars = async (req, res, next) => {
   try {
     // 1. Build sanitized match query for vehicles
-    const matchQuery = {};
-
-    // Filter by availability (default: true unless explicitly requested otherwise)
-    if (req.query.isAvailable !== undefined) {
-      matchQuery.isAvailable = req.query.isAvailable === 'true';
-    } else {
-      matchQuery.isAvailable = true;
-    }
+    const matchQuery = { isAvailable: true };
 
     // Filter by provider (Adv Req 2: "when viewing a provider's catalog")
     if (req.query.provider) {
@@ -263,48 +276,20 @@ exports.searchCars = async (req, res, next) => {
       }
     }
 
-    // Search by keyword across brand and model (case-insensitive regex)
+    // Search by keyword across brand and model (case-insensitive safe escaped regex)
     if (req.query.keyword && typeof req.query.keyword === 'string') {
-      const keywordRegex = new RegExp(req.query.keyword.trim(), 'i');
+      const safeKeyword = escapeRegex(req.query.keyword.trim());
+      const keywordRegex = new RegExp(safeKeyword, 'i');
       matchQuery.$or = [{ brand: keywordRegex }, { model: keywordRegex }];
-    } else {
-      if (req.query.brand && typeof req.query.brand === 'string') {
-        matchQuery.brand = new RegExp(req.query.brand.trim(), 'i');
-      }
-      if (req.query.model && typeof req.query.model === 'string') {
-        matchQuery.model = new RegExp(req.query.model.trim(), 'i');
-      }
     }
 
-    // Filter by capacity (supports both exact scalar and operator ranges)
-    if (req.query.capacity !== undefined) {
-      if (typeof req.query.capacity === 'object') {
-        const capFilter = {};
-        for (const [op, val] of Object.entries(req.query.capacity)) {
-          if (['gt', 'gte', 'lt', 'lte'].includes(op)) {
-            capFilter[`$${op}`] = parseInt(val, 10);
-          }
-        }
-        if (Object.keys(capFilter).length > 0) matchQuery.capacity = capFilter;
-      } else {
-        matchQuery.capacity = parseInt(req.query.capacity, 10);
-      }
-    }
+    // Filter by capacity (exact scalar or comparison operators)
+    const capFilter = parseNumericFilter(req.query.capacity);
+    if (capFilter !== undefined) matchQuery.capacity = capFilter;
 
-    // Filter by dailyRate in Satang (supports both exact scalar and operator ranges)
-    if (req.query.dailyRate !== undefined) {
-      if (typeof req.query.dailyRate === 'object') {
-        const rateFilter = {};
-        for (const [op, val] of Object.entries(req.query.dailyRate)) {
-          if (['gt', 'gte', 'lt', 'lte'].includes(op)) {
-            rateFilter[`$${op}`] = parseInt(val, 10);
-          }
-        }
-        if (Object.keys(rateFilter).length > 0) matchQuery.dailyRate = rateFilter;
-      } else {
-        matchQuery.dailyRate = parseInt(req.query.dailyRate, 10);
-      }
-    }
+    // Filter by dailyRate in Satang (exact scalar or comparison operators)
+    const rateFilter = parseNumericFilter(req.query.dailyRate);
+    if (rateFilter !== undefined) matchQuery.dailyRate = rateFilter;
 
     // Pagination parameters
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -330,11 +315,13 @@ exports.searchCars = async (req, res, next) => {
     sortStage._id = 1;
 
     // Build category count match stage:
-    // When searching within a provider, categoryCounts reflect available cars for that provider.
+    // Scopes to available cars and inherits active filters (keyword, provider, dailyRate, capacity)
+    // while omitting category filter itself to display available distribution across all categories
     const categoryCountMatch = { isAvailable: true };
-    if (matchQuery.provider) {
-      categoryCountMatch.provider = matchQuery.provider;
-    }
+    if (matchQuery.provider) categoryCountMatch.provider = matchQuery.provider;
+    if (matchQuery.dailyRate) categoryCountMatch.dailyRate = matchQuery.dailyRate;
+    if (matchQuery.capacity) categoryCountMatch.capacity = matchQuery.capacity;
+    if (matchQuery.$or) categoryCountMatch.$or = matchQuery.$or;
 
     // 2. Execute $facet aggregation pipeline in a single database roundtrip
     const [result] = await Car.aggregate([
