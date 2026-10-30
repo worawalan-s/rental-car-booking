@@ -183,6 +183,11 @@ erDiagram
 | `PUT` | `/api/v1/cars/:id` | Private (Admin) | Update car attributes with schema validators |
 | `DELETE` | `/api/v1/cars/:id` | Private (Admin) | Delete car with **cascading delete** of associated bookings |
 
+### 3.3 Pricing Resource (`/api/v1/pricing`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/pricing/calculate` | Public | Real-time financial pricing engine (Adv Req 3). Computes itemized rental pricing with pure integer Satang fixed-point arithmetic and 7% VAT rounding with zero IEEE 754 floating-point drift in <100ms. Supports direct `dailyRate` (Satang integer) or database lookup via `car` (ObjectId), rental duration bounds (`startDate`, `endDate`), vehicle count (`numOfCars` 1–3), and optional daily add-ons (`addOns`). Returns itemized breakdown: `{ durationDays, dailyRate, numOfCars, rentalBase, addOnsTotal, addOnsBreakdown, subtotal, vatRate: 0.07, vat, total, totalPrice }`. |
+
 ---
 
 ## 4. Input & Business Validation (Hybrid Architecture)
