@@ -1,17 +1,4 @@
-/**
- * Calculates rental duration in days (minimum 1 day for same-day rentals).
- *
- * @param {Date|string} startDate
- * @param {Date|string} endDate
- * @returns {number} Duration in days
- */
-const calculateDurationDays = (startDate, endDate) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const diffTime = end.getTime() - start.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return Math.max(1, diffDays);
-};
+const { calculateDurationDays } = require('./date');
 
 /**
  * Calculates baseline total rental price in Satang (fixed-point integer).
@@ -55,7 +42,7 @@ const calculateBaselinePrice = ({
  * - total = subtotal + vat
  *
  * @param {Object} params
- * @param {number} params.dailyRate - Daily rate in Satang (integer)
+ * @param {number} params.dailyRate - Daily rate in Satang (integer >= 1)
  * @param {Date|string} params.startDate - Rental pickup date
  * @param {Date|string} params.endDate - Rental return date
  * @param {number} [params.numOfCars=1] - Number of vehicles (1-3)
@@ -69,39 +56,81 @@ const calculatePricing = ({
   numOfCars = 1,
   addOns = [],
 }) => {
-  // Validate dailyRate
+  // Validate dailyRate: strictly positive integer in Satang (min: 1)
   if (
     typeof dailyRate !== 'number' ||
     !Number.isInteger(dailyRate) ||
-    dailyRate < 0
+    dailyRate < 1
   ) {
-    throw new Error('Daily rate must be a non-negative integer in Satang');
+    const err = new Error(
+      'Daily rate must be a positive integer in Satang (min: 1)'
+    );
+    err.statusCode = 400;
+    throw err;
   }
 
   // Validate dates
   if (!startDate || !endDate) {
-    throw new Error('Please provide valid start and end dates');
+    const err = new Error('Please provide valid start and end dates');
+    err.statusCode = 400;
+    throw err;
   }
 
   const start = new Date(startDate);
   const end = new Date(endDate);
 
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    throw new Error('Please provide valid start and end dates');
+    const err = new Error('Please provide valid start and end dates');
+    err.statusCode = 400;
+    throw err;
   }
 
   if (end.getTime() < start.getTime()) {
-    throw new Error('Rental return date cannot be before start date');
+    const err = new Error('Rental return date cannot be before start date');
+    err.statusCode = 400;
+    throw err;
   }
 
-  // Validate numOfCars
-  const carsCount = parseInt(numOfCars, 10) || 1;
-  if (carsCount < 1 || carsCount > 3) {
-    throw new Error('Number of cars must be between 1 and 3');
-  }
-
-  // Duration in days (minimum 1 day for same-day rental)
+  // Duration in days (minimum 1 day for same-day rental via shared utils/date)
   const durationDays = calculateDurationDays(startDate, endDate);
+
+  // Validate duration limit (max 30 days)
+  if (durationDays > 30) {
+    const err = new Error('Rental duration cannot exceed 30 days per booking');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Validate numOfCars strictly without || 1 fallback bypassing validation
+  let carsCount = 1;
+  if (numOfCars !== undefined && numOfCars !== null) {
+    if (typeof numOfCars === 'string') {
+      if (!/^\d+$/.test(numOfCars.trim())) {
+        const err = new Error(
+          'Number of cars must be an integer between 1 and 3'
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+      carsCount = parseInt(numOfCars.trim(), 10);
+    } else if (typeof numOfCars === 'number' && Number.isInteger(numOfCars)) {
+      carsCount = numOfCars;
+    } else {
+      const err = new Error(
+        'Number of cars must be an integer between 1 and 3'
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (carsCount < 1 || carsCount > 3) {
+      const err = new Error(
+        'Number of cars must be an integer between 1 and 3'
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+  }
 
   // Rental base charge: dailyRate * durationDays * numOfCars
   const rentalBase = dailyRate * durationDays * carsCount;
@@ -112,13 +141,76 @@ const calculatePricing = ({
 
   if (Array.isArray(addOns)) {
     for (const item of addOns) {
-      const price = parseInt(item.price, 10) || 0;
-      const quantity = parseInt(item.quantity, 10) || 1;
+      if (!item || typeof item !== 'object') {
+        const err = new Error('Each addOn item must be an object');
+        err.statusCode = 400;
+        throw err;
+      }
 
-      if (price < 0 || quantity < 1) {
-        throw new Error(
-          'Add-on quantity must be at least 1 and price cannot be negative'
+      // Validate price strictly: required non-negative integer Satang
+      let price;
+      if (item.price === undefined || item.price === null) {
+        const err = new Error(
+          'Each addOn item must specify a non-negative integer price in Satang'
         );
+        err.statusCode = 400;
+        throw err;
+      }
+      if (typeof item.price === 'string') {
+        if (!/^\d+$/.test(item.price.trim())) {
+          const err = new Error(
+            'AddOn price must be a non-negative integer in Satang'
+          );
+          err.statusCode = 400;
+          throw err;
+        }
+        price = parseInt(item.price.trim(), 10);
+      } else if (
+        typeof item.price === 'number' &&
+        Number.isInteger(item.price) &&
+        item.price >= 0
+      ) {
+        price = item.price;
+      } else {
+        const err = new Error(
+          'AddOn price must be a non-negative integer in Satang'
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // Validate quantity strictly: default 1, but if provided must be >= 1 without || 1 bypass
+      let quantity = 1;
+      if (item.quantity !== undefined && item.quantity !== null) {
+        if (typeof item.quantity === 'string') {
+          if (!/^\d+$/.test(item.quantity.trim())) {
+            const err = new Error(
+              'AddOn quantity must be an integer of at least 1'
+            );
+            err.statusCode = 400;
+            throw err;
+          }
+          quantity = parseInt(item.quantity.trim(), 10);
+        } else if (
+          typeof item.quantity === 'number' &&
+          Number.isInteger(item.quantity)
+        ) {
+          quantity = item.quantity;
+        } else {
+          const err = new Error(
+            'AddOn quantity must be an integer of at least 1'
+          );
+          err.statusCode = 400;
+          throw err;
+        }
+
+        if (quantity < 1) {
+          const err = new Error(
+            'AddOn quantity must be an integer of at least 1'
+          );
+          err.statusCode = 400;
+          throw err;
+        }
       }
 
       const itemTotal = price * quantity * durationDays;

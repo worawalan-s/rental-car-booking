@@ -19,7 +19,16 @@ exports.calculatePrice = async (req, res, next) => {
         });
       }
 
-      const carDoc = await Car.findById(car);
+      let carDoc;
+      try {
+        carDoc = await Car.findById(car);
+      } catch (dbErr) {
+        return res.status(500).json({
+          success: false,
+          message: 'Cannot calculate pricing',
+        });
+      }
+
       if (!carDoc) {
         return res.status(404).json({
           success: false,
@@ -30,18 +39,42 @@ exports.calculatePrice = async (req, res, next) => {
       dailyRate = carDoc.dailyRate;
     }
 
-    if (dailyRate === undefined) {
+    if (dailyRate === undefined || dailyRate === null) {
       return res.status(400).json({
         success: false,
         message: 'Please provide either dailyRate or a valid car ID',
       });
     }
 
-    // Parse dailyRate if string
-    dailyRate = typeof dailyRate === 'string' ? parseInt(dailyRate, 10) : dailyRate;
+    // Strictly validate dailyRate (reject floats, non-digits, and non-positive numbers)
+    let parsedRate;
+    if (typeof dailyRate === 'string') {
+      const trimmed = dailyRate.trim();
+      if (!/^\d+$/.test(trimmed)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Daily rate must be a positive integer in Satang (min: 1)',
+        });
+      }
+      parsedRate = parseInt(trimmed, 10);
+    } else if (typeof dailyRate === 'number' && Number.isInteger(dailyRate)) {
+      parsedRate = dailyRate;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Daily rate must be a positive integer in Satang (min: 1)',
+      });
+    }
+
+    if (parsedRate < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Daily rate must be a positive integer in Satang (min: 1)',
+      });
+    }
 
     const pricing = calculatePricing({
-      dailyRate,
+      dailyRate: parsedRate,
       startDate,
       endDate,
       numOfCars,
@@ -53,10 +86,16 @@ exports.calculatePrice = async (req, res, next) => {
       data: pricing,
     });
   } catch (err) {
-    // Two-key error envelope
-    res.status(400).json({
+    if (err.statusCode === 400 || err.message) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    // Strict two-key error envelope without internal diagnostics leak
+    res.status(500).json({
       success: false,
-      message: err.message || 'Cannot calculate pricing',
+      message: 'Cannot calculate pricing',
     });
   }
 };
