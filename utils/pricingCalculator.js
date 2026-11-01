@@ -14,6 +14,35 @@ const calculateDurationDays = (startDate, endDate) => {
 };
 
 /**
+ * Calculates baseline total rental price in Satang (fixed-point integer).
+ * Formula: (dailyRate * durationDays * numOfCars) + addOnsTotal
+ *
+ * @param {Object} params
+ * @param {number} params.dailyRate - Daily rate in Satang
+ * @param {number} params.durationDays - Rental duration in days
+ * @param {number} [params.numOfCars=1] - Number of cars booked
+ * @param {Array} [params.addOns=[]] - Array of add-ons { price, quantity }
+ * @returns {number} Total price in Satang
+ */
+const calculateBaselinePrice = ({
+  dailyRate,
+  durationDays,
+  numOfCars = 1,
+  addOns = [],
+}) => {
+  const rentalBase = durationDays * dailyRate * numOfCars;
+  const addOnsTotal = Array.isArray(addOns)
+    ? addOns.reduce(
+        (sum, item) =>
+          sum + (item.price || 0) * (item.quantity || 1) * durationDays,
+        0
+      )
+    : 0;
+
+  return rentalBase + addOnsTotal;
+};
+
+/**
  * Calculates deterministic pricing breakdown using pure integer Satang fixed-point arithmetic.
  * Zero IEEE 754 floating-point drift.
  *
@@ -133,5 +162,6 @@ const calculatePricing = ({
 
 module.exports = {
   calculateDurationDays,
+  calculateBaselinePrice,
   calculatePricing,
 };

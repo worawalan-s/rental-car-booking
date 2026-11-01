@@ -138,7 +138,11 @@ erDiagram
 | `createdAt` | `Date` | Default: `Date.now` | |
 | *`bookings`* | *Virtual* | Reverse populate | `ref: 'Booking', localField: '_id', foreignField: 'car'` |
 
-- **Compound Index**: `{ provider: 1, category: 1, isAvailable: 1 }` (Enables sub-200ms real-time category filtering).
+- **Compound Indexes**:
+  - `{ provider: 1, category: 1, isAvailable: 1 }` (Provider catalog sub-200ms real-time category filtering)
+  - `{ isAvailable: 1, category: 1 }` (Global search real-time category aggregation with proper prefix)
+  - `{ isAvailable: 1, dailyRate: 1 }` (Availability and price range sorting/filtering)
+  - `{ brand: 1, model: 1 }` (Keyword search indexing preventing COLLSCAN)
 
 ---
 
@@ -178,16 +182,21 @@ erDiagram
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/cars` | Public | List cars with filtering (`?category=Sedan`), sorting (`?sort=dailyRate`), pagination (`?page=1&limit=10`), and populated `provider` + `bookings` |
+| `GET` | `/api/v1/cars/search` | Public | High-performance search and aggregation pipeline (Adv Req 2). Returns paginated vehicle results and dynamic real-time counts across all 7 vehicle categories (`Sedan`, `SUV`, `Hatchback`, `Van`, `Truck`, `Luxury`, `Electric`) in under 200ms using MongoDB `$facet` supported by compound indexes `{ provider: 1, category: 1, isAvailable: 1 }`, `{ isAvailable: 1, category: 1 }`, `{ isAvailable: 1, dailyRate: 1 }`, and `{ brand: 1, model: 1 }`. Category counts dynamically reflect active search filters (faceted search). Supports safe escaped keyword text search (`?keyword=` on brand/model), category filters (`?category=`), scalar and range operator filters on `dailyRate` (in Satang) and `capacity`, provider scoping (`?provider=`), and dynamic sorting (`?sort=`, defaults to `-createdAt`). Returns clean standard response envelope `{ success: true, count, total, pagination, categoryCounts, data }` with zero diagnostics leakage; failures strictly follow two-key `{ success: false, message }` format. |
 | `GET` | `/api/v1/cars/:id` | Public | Get single car with populated `provider` and virtual `bookings` |
 | `POST` | `/api/v1/cars` | Private (Admin) | Create new car with schema-enforced validations and Satang rate |
 | `PUT` | `/api/v1/cars/:id` | Private (Admin) | Update car attributes with schema validators |
 | `DELETE` | `/api/v1/cars/:id` | Private (Admin) | Delete car with **cascading delete** of associated bookings |
 
-### 3.3 Pricing Resource (`/api/v1/pricing`)
+### 3.3 Bookings Resource (`/api/v1/bookings`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/bookings` | Private (User) | Create vehicle reservation. Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$. Exceeding quota returns HTTP 400 (`User with ID <id> has already reached the maximum quota of 3 cars`). Admins cannot create bookings (`authorize('user')` returns HTTP 403 Forbidden; admin scope is restricted to view, edit, delete). Validates car existence and availability, auto-assigns `provider = car.provider`, enforces explicit initial status (`'Pending'`), and calculates baseline `totalPrice = (dailyRate * durationDays * numOfCars) + addOnsTotal` (with daily add-on rates multiplied by `durationDays`) in integer Satang via `utils/pricingCalculator.js`. Validation failures return HTTP 400 Bad Request while server errors return HTTP 500 (`Cannot create Booking`). Strictly enforces two-key error responses. |
+
+### 3.4 Pricing Resource (`/api/v1/pricing`)
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/pricing/calculate` | Public | Real-time financial pricing engine (Adv Req 3). Computes itemized rental pricing with pure integer Satang fixed-point arithmetic and 7% VAT rounding with zero IEEE 754 floating-point drift in <100ms. Supports direct `dailyRate` (Satang integer) or database lookup via `car` (ObjectId), rental duration bounds (`startDate`, `endDate`), vehicle count (`numOfCars` 1–3), and optional daily add-ons (`addOns`). Returns itemized breakdown: `{ durationDays, dailyRate, numOfCars, rentalBase, addOnsTotal, addOnsBreakdown, subtotal, vatRate: 0.07, vat, total, totalPrice }`. |
-
 ---
 
 ## 4. Input & Business Validation (Hybrid Architecture)

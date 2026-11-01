@@ -34,6 +34,7 @@ app.set('query parser', 'extended');
 // Route files
 const auth = require('./routes/auth');
 const cars = require('./routes/cars');
+const bookings = require('./routes/bookings');
 const pricing = require('./routes/pricing');
 
 // Base health check
@@ -47,6 +48,7 @@ app.get('/api/v1/health', (req, res) => {
 // Mount routers
 app.use('/api/v1/auth', auth);
 app.use('/api/v1/cars', cars);
+app.use('/api/v1/bookings', bookings);
 app.use('/api/v1/pricing', pricing);
 
 const PORT = process.env.PORT || 5000;
