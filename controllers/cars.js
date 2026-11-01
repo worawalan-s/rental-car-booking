@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Car = require('../models/Car');
 const Provider = require('../models/Provider');
 const Booking = require('../models/Booking');
@@ -223,3 +224,215 @@ exports.deleteCar = async (req, res, next) => {
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
+// Helper to escape regex special characters
+const escapeRegex = (text) =>
+  text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+
+// Helper to parse numeric filters (supports both exact scalar and operator objects)
+const parseNumericFilter = (param) => {
+  if (param === undefined || param === null) return undefined;
+  if (typeof param === 'object') {
+    const filter = {};
+    for (const [op, val] of Object.entries(param)) {
+      if (['gt', 'gte', 'lt', 'lte'].includes(op)) {
+        filter[`$${op}`] = parseInt(val, 10);
+      }
+    }
+    return Object.keys(filter).length > 0 ? filter : undefined;
+  }
+  const parsed = parseInt(param, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
+// @desc      Search cars with real-time category aggregation pipeline (<200ms)
+// @route     GET /api/v1/cars/search
+// @access    Public
+exports.searchCars = async (req, res, next) => {
+  try {
+    // 1. Build sanitized match query for vehicles
+    const matchQuery = { isAvailable: true };
+
+    // Filter by provider (Adv Req 2: "when viewing a provider's catalog")
+    if (req.query.provider) {
+      if (mongoose.isValidObjectId(req.query.provider)) {
+        matchQuery.provider = new mongoose.Types.ObjectId(req.query.provider);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid provider ID format: ${req.query.provider}`,
+        });
+      }
+    }
+
+    // Filter by vehicle category (single or comma-separated)
+    if (req.query.category) {
+      if (Array.isArray(req.query.category)) {
+        matchQuery.category = { $in: req.query.category };
+      } else if (typeof req.query.category === 'string') {
+        const categories = req.query.category.split(',').map((c) => c.trim());
+        matchQuery.category =
+          categories.length > 1 ? { $in: categories } : categories[0];
+      }
+    }
+
+    // Search by keyword across brand and model (case-insensitive safe escaped regex)
+    if (req.query.keyword && typeof req.query.keyword === 'string') {
+      const safeKeyword = escapeRegex(req.query.keyword.trim());
+      const keywordRegex = new RegExp(safeKeyword, 'i');
+      matchQuery.$or = [{ brand: keywordRegex }, { model: keywordRegex }];
+    }
+
+    // Filter by capacity (exact scalar or comparison operators)
+    const capFilter = parseNumericFilter(req.query.capacity);
+    if (capFilter !== undefined) matchQuery.capacity = capFilter;
+
+    // Filter by dailyRate in Satang (exact scalar or comparison operators)
+    const rateFilter = parseNumericFilter(req.query.dailyRate);
+    if (rateFilter !== undefined) matchQuery.dailyRate = rateFilter;
+
+    // Pagination parameters
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const rawLimit = parseInt(req.query.limit, 10) || 25;
+    const limit = Math.min(Math.max(rawLimit, 1), 50);
+    const skip = (page - 1) * limit;
+
+    // Sorting parameters (defaults to createdAt descending, latest first)
+    const sortStage = {};
+    if (req.query.sort && typeof req.query.sort === 'string') {
+      const sortFields = req.query.sort.split(',');
+      sortFields.forEach((field) => {
+        const trimmed = field.trim();
+        if (trimmed.startsWith('-')) {
+          sortStage[trimmed.substring(1)] = -1;
+        } else {
+          sortStage[trimmed] = 1;
+        }
+      });
+    } else {
+      sortStage.createdAt = -1;
+    }
+    sortStage._id = 1;
+
+    // Build category count match stage:
+    // Scopes to available cars and inherits active filters (keyword, provider, dailyRate, capacity)
+    // while omitting category filter itself to display available distribution across all categories
+    const categoryCountMatch = { isAvailable: true };
+    if (matchQuery.provider) categoryCountMatch.provider = matchQuery.provider;
+    if (matchQuery.dailyRate) categoryCountMatch.dailyRate = matchQuery.dailyRate;
+    if (matchQuery.capacity) categoryCountMatch.capacity = matchQuery.capacity;
+    if (matchQuery.$or) categoryCountMatch.$or = matchQuery.$or;
+
+    // 2. Execute $facet aggregation pipeline in a single database roundtrip
+    const [result] = await Car.aggregate([
+      {
+        $facet: {
+          paginatedResults: [
+            { $match: matchQuery },
+            { $sort: sortStage },
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $lookup: {
+                from: 'providers',
+                localField: 'provider',
+                foreignField: '_id',
+                as: 'provider',
+              },
+            },
+            {
+              $unwind: {
+                path: '$provider',
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+            {
+              $project: {
+                brand: 1,
+                model: 1,
+                category: 1,
+                dailyRate: 1,
+                capacity: 1,
+                isAvailable: 1,
+                createdAt: 1,
+                'provider._id': 1,
+                'provider.name': 1,
+                'provider.address': 1,
+                'provider.tel': 1,
+              },
+            },
+          ],
+          totalCount: [
+            { $match: matchQuery },
+            { $count: 'total' },
+          ],
+          categoryCounts: [
+            { $match: categoryCountMatch },
+            {
+              $group: {
+                _id: '$category',
+                count: { $sum: 1 },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    // 3. Process facet results
+    const cars = (result && result.paginatedResults) || [];
+    const total =
+      (result &&
+        result.totalCount &&
+        result.totalCount[0] &&
+        result.totalCount[0].total) ||
+      0;
+
+    // Dynamically retrieve schema category enum values
+    const categoryCountsMap = {};
+    const schemaCategories = Car.schema.path('category').enumValues || [];
+    schemaCategories.forEach((cat) => {
+      categoryCountsMap[cat] = 0;
+    });
+
+    if (result && Array.isArray(result.categoryCounts)) {
+      result.categoryCounts.forEach((item) => {
+        if (categoryCountsMap[item._id] !== undefined) {
+          categoryCountsMap[item._id] = item.count;
+        }
+      });
+    }
+
+    // Pagination metadata
+    const pagination = {};
+    if (skip + limit < total) {
+      pagination.next = {
+        page: page + 1,
+        limit,
+      };
+    }
+    if (skip > 0) {
+      pagination.prev = {
+        page: page - 1,
+        limit,
+      };
+    }
+
+    // Strict Standard Response Envelope (No diagnostics leakage)
+    res.status(200).json({
+      success: true,
+      count: cars.length,
+      total,
+      pagination,
+      categoryCounts: categoryCountsMap,
+      data: cars,
+    });
+  } catch (err) {
+    // Strict Two-Key Error Envelope
+    res.status(500).json({
+      success: false,
+      message: 'Cannot search cars',
+    });
+  }
+};
+
