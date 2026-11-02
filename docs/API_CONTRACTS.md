@@ -193,6 +193,10 @@ erDiagram
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/bookings` | Private (User) | Create vehicle reservation. Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$. Exceeding quota returns HTTP 400 (`User with ID <id> has already reached the maximum quota of 3 cars`). Admins cannot create bookings (`authorize('user')` returns HTTP 403 Forbidden; admin scope is restricted to view, edit, delete). Validates car existence and availability, auto-assigns `provider = car.provider`, enforces explicit initial status (`'Pending'`), and calculates baseline `totalPrice = (dailyRate * durationDays * numOfCars) + addOnsTotal` (with daily add-on rates multiplied by `durationDays`) in integer Satang via `utils/pricingCalculator.js`. Validation failures return HTTP 400 Bad Request while server errors return HTTP 500 (`Cannot create Booking`). Strictly enforces two-key error responses. |
 
+### 3.4 Pricing Resource (`/api/v1/pricing`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/pricing/calculate` | Public | Real-time financial pricing engine (Adv Req 3). Computes itemized rental pricing with pure integer Satang fixed-point arithmetic and 7% VAT rounding with zero IEEE 754 floating-point drift in <100ms. Enforces business validation middleware (`validateBookingDates`: non-past dates, duration 1–30 days). Supports direct `dailyRate` (positive integer in Satang, min: 1) or database lookup via `car` (ObjectId), rental duration bounds (`startDate`, `endDate`), vehicle count (`numOfCars` 1–3), and optional daily add-ons (`addOns` with required non-negative integer `price`). Returns itemized breakdown: `{ durationDays, dailyRate, numOfCars, rentalBase, addOnsTotal, addOnsBreakdown, subtotal, vatRate: 0.07, vat, total, totalPrice }`. |
 ---
 
 ## 4. Input & Business Validation (Hybrid Architecture)
