@@ -102,6 +102,73 @@ const validateBookingDates = (req, res, next) => {
 };
 
 /**
+ * Validates rental booking dates for update/rescheduling operations.
+ * Allows partial updates; validates date formats, non-past start date,
+ * and max 30-day duration if dates are updated.
+ */
+const validateBookingUpdateDates = (req, res, next) => {
+  const { startDate, endDate } = req.body || {};
+
+  // If neither date is being updated, pass through
+  if (startDate === undefined && endDate === undefined) {
+    return next();
+  }
+
+  if (startDate !== undefined) {
+    if (isNaN(Date.parse(startDate))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid rental start date format',
+      });
+    }
+
+    const start = new Date(startDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (start < today) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rental start date cannot be in the past',
+      });
+    }
+  }
+
+  if (endDate !== undefined) {
+    if (isNaN(Date.parse(endDate))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid rental return date format',
+      });
+    }
+  }
+
+  if (startDate !== undefined && endDate !== undefined) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (end < start) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rental return date cannot be before start date',
+      });
+    }
+
+    const durationDays = calculateDurationDays(start, end);
+    if (durationDays > 30) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rental duration cannot exceed 30 days per booking',
+      });
+    }
+
+    req.durationDays = durationDays;
+  }
+
+  next();
+};
+
+/**
  * Validates full booking creation payload (dates, car, provider, numOfCars, addOns).
  */
 const validateBookingPayload = (req, res, next) => {
@@ -178,5 +245,6 @@ module.exports = {
   isPositiveInteger,
   sanitizeAuthBody,
   validateBookingDates,
+  validateBookingUpdateDates,
   validateBookingPayload,
 };

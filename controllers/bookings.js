@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Car = require('../models/Car');
 const { calculateDurationDays } = require('../utils/date');
 const { calculateBaselinePrice } = require('../utils/pricingCalculator');
+const { calculateActiveCars } = require('../utils/quota');
 
 /**
  * @desc    Create new booking
@@ -38,10 +39,7 @@ exports.createBooking = async (req, res, next) => {
       status: { $in: ['Pending', 'Confirmed', 'Active'] },
     });
 
-    const activeCarsSum = activeBookings.reduce(
-      (total, b) => total + (b.numOfCars || 1),
-      0
-    );
+    const activeCarsSum = calculateActiveCars(activeBookings);
     const requestedCars = req.body.numOfCars || 1;
 
     if (activeCarsSum + requestedCars > 3) {
@@ -95,9 +93,15 @@ exports.createBooking = async (req, res, next) => {
 exports.getBookings = async (req, res, next) => {
   let query;
 
+  // Filter by status if provided in query (Issue #20)
+  const filter = {};
+  if (req.query.status) {
+    filter.status = req.query.status;
+  }
+
   // General users can only view their own bookings; Admins can view all bookings
   if (req.user.role !== 'admin') {
-    query = Booking.find({ user: req.user.id })
+    query = Booking.find({ user: req.user.id, ...filter })
       .populate({
         path: 'car',
         select: 'brand model category dailyRate isAvailable provider',
@@ -107,7 +111,7 @@ exports.getBookings = async (req, res, next) => {
         select: 'name address tel',
       });
   } else {
-    query = Booking.find()
+    query = Booking.find(filter)
       .populate({
         path: 'car',
         select: 'brand model category dailyRate isAvailable provider',
@@ -200,13 +204,20 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
-    // Prevent regular user from changing ownership or status
+    // 1. Critical Security: Never allow clients to inject totalPrice directly
+    delete req.body.totalPrice;
+
+    // 2. Disallow changing vehicle/provider in-place to prevent provider desynchronization (Issue #19)
+    delete req.body.car;
+    delete req.body.provider;
+
+    // 3. Prevent regular user from changing ownership or status
     if (req.user.role !== 'admin') {
       delete req.body.user;
       delete req.body.status;
     }
 
-    // If numOfCars is being updated by a regular user, verify 3-car quota
+    // 4. If numOfCars is being updated by a regular user, verify 3-car quota using quota helper
     if (req.user.role !== 'admin' && req.body.numOfCars !== undefined) {
       const activeBookings = await Booking.find({
         user: req.user.id,
@@ -214,10 +225,7 @@ exports.updateBooking = async (req, res, next) => {
         status: { $in: ['Pending', 'Confirmed', 'Active'] },
       });
 
-      const activeCarsSum = activeBookings.reduce(
-        (total, b) => total + (b.numOfCars || 1),
-        0
-      );
+      const activeCarsSum = calculateActiveCars(activeBookings);
 
       if (activeCarsSum + req.body.numOfCars > 3) {
         return res.status(400).json({
@@ -227,30 +235,47 @@ exports.updateBooking = async (req, res, next) => {
       }
     }
 
-    // If dates, car, numOfCars, or addOns change, validate and recalculate totalPrice
+    // 5. Date validation and schedule collision prevention
+    const startDate = req.body.startDate || booking.startDate;
+    const endDate = req.body.endDate || booking.endDate;
+
+    if (new Date(endDate) < new Date(startDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rental return date cannot be before start date',
+      });
+    }
+
+    // If dates are modified, enforce Schedule Collision Prevention (AGENTS.md Invariant 5)
+    if (req.body.startDate || req.body.endDate) {
+      const collision = await Booking.findOne({
+        car: booking.car,
+        _id: { $ne: booking._id },
+        status: { $in: ['Pending', 'Confirmed', 'Active'] },
+        startDate: { $lt: endDate },
+        endDate: { $gt: startDate },
+      });
+
+      if (collision) {
+        return res.status(400).json({
+          success: false,
+          message: 'Car is already reserved for the selected dates',
+        });
+      }
+    }
+
+    // 6. Recalculate totalPrice if dates, numOfCars, or addOns change
     if (
       req.body.startDate ||
       req.body.endDate ||
-      req.body.car ||
-      req.body.numOfCars ||
-      req.body.addOns
+      req.body.numOfCars !== undefined ||
+      req.body.addOns !== undefined
     ) {
-      const startDate = req.body.startDate || booking.startDate;
-      const endDate = req.body.endDate || booking.endDate;
-
-      if (new Date(endDate) < new Date(startDate)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Rental return date cannot be before start date',
-        });
-      }
-
-      const carId = req.body.car || booking.car;
-      const car = await Car.findById(carId);
+      const car = await Car.findById(booking.car);
       if (!car) {
         return res.status(404).json({
           success: false,
-          message: `No car found with the id of ${carId}`,
+          message: `No car found with the id of ${booking.car}`,
         });
       }
 
