@@ -217,7 +217,20 @@ exports.updateBooking = async (req, res, next) => {
       delete req.body.status;
     }
 
-    // 4. If numOfCars is being updated by a regular user, verify 3-car quota using quota helper
+    // 4. Validate numOfCars format and enforce 3-car quota using quota helper
+    if (req.body.numOfCars !== undefined) {
+      if (
+        !Number.isInteger(req.body.numOfCars) ||
+        req.body.numOfCars < 1 ||
+        req.body.numOfCars > 3
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Number of cars must be an integer between 1 and 3',
+        });
+      }
+    }
+
     if (req.user.role !== 'admin' && req.body.numOfCars !== undefined) {
       const activeBookings = await Booking.find({
         user: req.user.id,
@@ -243,6 +256,14 @@ exports.updateBooking = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Rental return date cannot be before start date',
+      });
+    }
+
+    const durationDays = calculateDurationDays(startDate, endDate);
+    if (durationDays > 30) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rental duration cannot exceed 30 days per booking',
       });
     }
 
