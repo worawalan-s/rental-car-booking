@@ -168,6 +168,29 @@ erDiagram
 
 ---
 
+### 2.5 AddOn Model (`models/AddOn.js`)
+*Physical rental accessory inventory model supporting atomic concurrency locking and ACID transactions (Adv Req 4).*
+
+| Field | Type | Validation / Rules | Notes |
+| :--- | :--- | :--- | :--- |
+| `_id` | `ObjectId` | Auto-generated PK | |
+| `name` | `String` | Required, Max 100 chars, Trim | E.g. `'Garmin GPS Navigator'` |
+| `category` | `String` | Enum: `['Equipment', 'Child Safety', 'Connectivity', 'Accessory']` | Accessory categorization |
+| `description` | `String` | Optional, Max 500 chars, Trim | Item specification |
+| `dailyRate` | `Number` | Required, Min: 0, **Integer in Satang** | Daily rental cost (`15000` = 150.00 THB) |
+| `inventoryStock` | `Number` | Required, Min: 0, Integer | Total physical inventory count owned |
+| `allocatedStock` | `Number` | Default: 0, Min: 0, Integer | Currently reserved/locked units |
+| `availableStock` | `Number` | Min: 0, Integer | Real-time available units (`inventoryStock - allocatedStock`) |
+| `isAvailable` | `Boolean` | Default: `true` | Availability status flag |
+| `provider` | `ObjectId` | Ref: `'Provider'`, Required | Owning rental provider branch |
+| `createdAt` | `Date` | Default: `Date.now` | |
+
+- **Compound Indexes**:
+  - `{ provider: 1, isAvailable: 1, availableStock: 1 }` (Accelerates provider add-on catalog queries)
+  - `{ name: 1, provider: 1 }` (Unique constraint: prevents duplicate accessories per branch)
+
+---
+
 ## 3. Implemented API Endpoints
 
 ### 3.1 Authentication (`/api/v1/auth`)
@@ -191,12 +214,21 @@ erDiagram
 ### 3.3 Bookings Resource (`/api/v1/bookings`)
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/bookings` | Private (User) | Create vehicle reservation. Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$. Exceeding quota returns HTTP 400 (`User with ID <id> has already reached the maximum quota of 3 cars`). Admins cannot create bookings (`authorize('user')` returns HTTP 403 Forbidden; admin scope is restricted to view, edit, delete). Validates car existence and availability, auto-assigns `provider = car.provider`, enforces explicit initial status (`'Pending'`), and calculates baseline `totalPrice = (dailyRate * durationDays * numOfCars) + addOnsTotal` (with daily add-on rates multiplied by `durationDays`) in integer Satang via `utils/pricingCalculator.js`. Validation failures return HTTP 400 Bad Request while server errors return HTTP 500 (`Cannot create Booking`). Strictly enforces two-key error responses. |
+| `POST` | `/api/v1/bookings` | Private (User) | Create vehicle reservation with **atomic add-on pessimistic reservation & ACID transaction rollback guarantee** (Adv Req 4). Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$ (exceeding returns HTTP 400). Admins cannot create bookings (`authorize('user')` returns HTTP 403 Forbidden). Atomically locks requested physical add-ons within a `mongoose.startSession()` ACID transaction using `findOneAndUpdate({ _id, isAvailable: true, availableStock: { $gte: qty } }, { $inc: { allocatedStock: qty, availableStock: -qty } })`. If any accessory stock is insufficient or belongs to a different provider branch, the transaction aborts and returns HTTP 400 (`Insufficient inventory stock for add-on: <id>`). Enforces schedule collision checks, validates car existence and availability, auto-assigns `provider = car.provider`, enforces explicit initial status (`'Pending'`), and calculates baseline `totalPrice` in integer Satang. Releasing or cancelling active reservations safely restores allocated physical inventory. Failures return strict two-key error responses. |
 
 ### 3.4 Pricing Resource (`/api/v1/pricing`)
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/pricing/calculate` | Public | Real-time financial pricing engine (Adv Req 3). Computes itemized rental pricing with pure integer Satang fixed-point arithmetic and 7% VAT rounding with zero IEEE 754 floating-point drift in <100ms. Enforces business validation middleware (`validateBookingDates`: non-past dates, duration 1–30 days). Supports direct `dailyRate` (positive integer in Satang, min: 1) or database lookup via `car` (ObjectId), rental duration bounds (`startDate`, `endDate`), vehicle count (`numOfCars` 1–3), and optional daily add-ons (`addOns` with required non-negative integer `price`). Returns itemized breakdown: `{ durationDays, dailyRate, numOfCars, rentalBase, addOnsTotal, addOnsBreakdown, subtotal, vatRate: 0.07, vat, total, totalPrice }`. |
+
+### 3.5 Add-ons Resource (`/api/v1/addons`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/addons` | Public | List available physical add-on inventory with filtering (`?provider=<id>`, `?category=Equipment`) and populated `provider` details |
+| `GET` | `/api/v1/addons/:id` | Public | Get single add-on document with populated `provider` |
+| `POST` | `/api/v1/addons` | Private (Admin) | Create physical add-on accessory (`name`, `category`, `dailyRate`, `inventoryStock`, `provider`). Auto-computes `availableStock = inventoryStock` |
+| `PUT` | `/api/v1/addons/:id` | Private (Admin) | Update add-on pricing, details, or adjust stock counts (auto-recalculates `availableStock`) |
+| `DELETE` | `/api/v1/addons/:id` | Private (Admin) | Delete add-on document |
 ---
 
 ## 4. Input & Business Validation (Hybrid Architecture)
