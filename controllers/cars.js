@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Car = require('../models/Car');
 const Provider = require('../models/Provider');
 const Booking = require('../models/Booking');
+const { releaseBookingAddOns } = require('../utils/bookingInventory');
 
 // @desc      Get all cars
 // @route     GET /api/v1/cars
@@ -202,26 +203,51 @@ exports.updateCar = async (req, res, next) => {
 // @route     DELETE /api/v1/cars/:id
 // @access    Private (Admin only)
 exports.deleteCar = async (req, res, next) => {
+  const session = await mongoose.startSession();
   try {
-    const car = await Car.findById(req.params.id);
+    session.startTransaction();
+
+    const car = await Car.findById(req.params.id).session(session);
 
     if (!car) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: `Car not found with id of ${req.params.id}`,
       });
     }
 
+    // Restore allocated physical add-on stock for active bookings before cascade delete
+    const activeBookings = await Booking.find({
+      car: req.params.id,
+      status: { $in: ['Pending', 'Confirmed', 'Active'] },
+    }).session(session);
+
+    for (const booking of activeBookings) {
+      await releaseBookingAddOns(booking, session);
+    }
+
     // Cascade delete associated bookings (Assignment 7.2 pattern)
-    await Booking.deleteMany({ car: req.params.id });
-    await Car.deleteOne({ _id: req.params.id });
+    await Booking.deleteMany({ car: req.params.id }, { session });
+    await Car.deleteOne({ _id: req.params.id }, { session });
+
+    await session.commitTransaction();
 
     res.status(200).json({
       success: true,
       data: {},
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    await session.abortTransaction();
+    if (err.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: `Resource not found with id of ${err.value}`,
+      });
+    }
+    res.status(500).json({ success: false, message: 'Cannot delete car' });
+  } finally {
+    session.endSession();
   }
 };
 
