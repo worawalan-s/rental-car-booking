@@ -207,7 +207,12 @@ const validateBookingPayload = (req, res, next) => {
     }
 
     for (const item of addOns) {
-      if (!item.addOn || !isValidObjectId(item.addOn)) {
+      if (
+        !item ||
+        typeof item !== 'object' ||
+        !item.addOn ||
+        !isValidObjectId(item.addOn)
+      ) {
         return res.status(400).json({
           success: false,
           message: 'Each addOn item must contain a valid addOn ID',
@@ -237,6 +242,64 @@ const validateBookingPayload = (req, res, next) => {
   validateBookingDates(req, res, next);
 };
 
+/**
+ * Validates request route parameter as a valid MongoDB ObjectId.
+ */
+const validateObjectId = (paramName = 'id', resourceName) => (req, res, next) => {
+  if (!isValidObjectId(req.params[paramName])) {
+    const label = resourceName || `${paramName} ID`;
+    return res.status(400).json({
+      success: false,
+      message: `Invalid ${label} format: ${req.params[paramName]}`,
+    });
+  }
+  next();
+};
+
+/**
+ * Validates optional request query parameter as a valid MongoDB ObjectId if provided.
+ */
+const validateQueryObjectId = (queryName = 'provider', resourceName) => (req, res, next) => {
+  if (req.query && req.query[queryName]) {
+    if (!isValidObjectId(req.query[queryName])) {
+      const label = resourceName || `${queryName} ID`;
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${label} format: ${req.query[queryName]}`,
+      });
+    }
+  }
+  next();
+};
+
+/**
+ * Validates add-on creation payload (checks required provider ObjectId).
+ */
+const validateAddOnPayload = (req, res, next) => {
+  const { provider } = req.body || {};
+  if (!provider || !isValidObjectId(provider)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide a valid provider ID for the add-on',
+    });
+  }
+  next();
+};
+
+/**
+ * Validates add-on update payload (checks optional provider ObjectId).
+ */
+const validateAddOnUpdatePayload = (req, res, next) => {
+  const { provider } = req.body || {};
+  if (provider !== undefined && !isValidObjectId(provider)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid provider ID format: ${provider}`,
+    });
+  }
+  next();
+};
+
 module.exports = {
   isValidObjectId,
   isNonEmptyString,
@@ -247,4 +310,8 @@ module.exports = {
   validateBookingDates,
   validateBookingUpdateDates,
   validateBookingPayload,
+  validateObjectId,
+  validateQueryObjectId,
+  validateAddOnPayload,
+  validateAddOnUpdatePayload,
 };
