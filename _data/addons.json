@@ -1,0 +1,34 @@
+[
+  {
+    "name": "Garmin GPS Navigator",
+    "category": "Equipment",
+    "description": "High-precision GPS navigation device with preloaded offline Thailand maps and voice guidance.",
+    "dailyRate": 15000,
+    "inventoryStock": 5,
+    "isAvailable": true
+  },
+  {
+    "name": "Infant Safety Car Seat",
+    "category": "Child Safety",
+    "description": "Certified ISOFIX rear and front-facing car seat suitable for infants and toddlers up to 18kg.",
+    "dailyRate": 20000,
+    "inventoryStock": 3,
+    "isAvailable": true
+  },
+  {
+    "name": "4G Portable WiFi Hotspot",
+    "category": "Connectivity",
+    "description": "Pocket WiFi device providing high-speed unlimited 4G LTE wireless internet for up to 8 devices.",
+    "dailyRate": 18000,
+    "inventoryStock": 4,
+    "isAvailable": true
+  },
+  {
+    "name": "Universal Roof Luggage Rack",
+    "category": "Accessory",
+    "description": "Heavy-duty aluminum roof rack basket for extra luggage, camping gear, and outdoor equipment.",
+    "dailyRate": 25000,
+    "inventoryStock": 2,
+    "isAvailable": true
+  }
+]
