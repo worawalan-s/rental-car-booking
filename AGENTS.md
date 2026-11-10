@@ -49,7 +49,7 @@ Every AI agent working on models, controllers, or utilities MUST enforce these c
    - Public registration (`POST /api/v1/auth/register`) strictly sets `role: 'user'` regardless of payload.
 4. **Cumulative 3-Car Quota Limit**:
    - Standard renters (`role: 'user'`) are limited to a maximum of 3 cars across all active reservations (`status` in `['Pending', 'Confirmed', 'Active']`).
-   - Admin users are exempt from the quota limit.
+   - Admins cannot create bookings directly (`POST /api/v1/bookings` is restricted to `role: 'user'` per `API_CONTRACTS.md §3.3`). The quota exemption applies when admins manage or update bookings (`PUT /api/v1/bookings/:id`) on behalf of users.
 5. **Schedule Collision Prevention**:
    - The same physical vehicle (`car._id`) cannot have overlapping active reservations.
    - Formula: Existing `startDate < newEndDate` AND Existing `endDate > newStartDate`.

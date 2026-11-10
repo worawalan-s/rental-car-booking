@@ -38,6 +38,15 @@ async function main() {
   console.log('====================================================');
 
   let serverProcess = null;
+
+  const stopServer = () => {
+    if (serverProcess) {
+      console.log('\n[INFO] Stopping temporary server process...');
+      serverProcess.kill('SIGTERM');
+      serverProcess = null;
+    }
+  };
+
   const isAlreadyRunning = await checkServerRunning(BASE_URL);
 
   if (isAlreadyRunning) {
@@ -57,7 +66,7 @@ async function main() {
     const isUp = await waitForServer(BASE_URL);
     if (!isUp) {
       console.error('[FATAL] Timed out waiting for server to start.');
-      if (serverProcess) serverProcess.kill('SIGTERM');
+      stopServer();
       process.exit(1);
     }
     console.log(`[SUCCESS] Express server is alive at ${BASE_URL}`);
@@ -81,10 +90,7 @@ async function main() {
     console.error('\n[FAILURE] Newman test run encountered failures.');
     exitCode = 1;
   } finally {
-    if (serverProcess) {
-      console.log('\n[INFO] Stopping temporary server process...');
-      serverProcess.kill('SIGTERM');
-    }
+    stopServer();
   }
 
   process.exit(exitCode);

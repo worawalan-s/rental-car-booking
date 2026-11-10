@@ -989,13 +989,15 @@
                   "pm.test('Status code is 200 OK', function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "pm.test('Returns add-ons and captures ADDON_ID', function () {",
+                  "pm.test('Returns list of available add-ons', function () {",
                   "    const jsonData = pm.response.json();",
                   "    pm.expect(jsonData.success).to.be.true;",
                   "    pm.expect(jsonData.data).to.be.an('array');",
-                  "    if (jsonData.data.length > 0) {",
-                  "        pm.environment.set('ADDON_ID', jsonData.data[0]._id);",
-                  "    }",
+                  "    pm.expect(jsonData.count).to.be.above(0);",
+                  "    const provId = pm.environment.get('PROVIDER_ID');",
+                  "    const matchingAddOn = jsonData.data.find(a => (a.provider._id || a.provider) === provId) || jsonData.data[0];",
+                  "    pm.environment.set('ADDON_ID', matchingAddOn._id);",
+                  "    pm.environment.set('INITIAL_ADDON_STOCK', matchingAddOn.availableStock);",
                   "});"
                 ]
               }
@@ -1354,7 +1356,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"car\":\"{{CREATED_CAR_ID}}\",\"startDate\":\"{{DATE_D10}}\",\"endDate\":\"{{DATE_D12}}\",\"numOfCars\":1}"
+              "raw": "{\"car\":\"{{CREATED_CAR_ID}}\",\"startDate\":\"{{DATE_D10}}\",\"endDate\":\"{{DATE_D12}}\",\"numOfCars\":1,\"addOns\":[{\"addOn\":\"{{ADDON_ID}}\",\"quantity\":1}]}"
             },
             "url": {
               "raw": "{{URL}}/api/v1/bookings",
@@ -1365,6 +1367,44 @@
                 "api",
                 "v1",
                 "bookings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Add-on Stock Decremented (GET /api/v1/addons/{{ADDON_ID}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Add-on stock was decremented by 1 during booking creation', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const initialStock = Number(pm.environment.get('INITIAL_ADDON_STOCK'));",
+                  "    pm.expect(jsonData.data.availableStock).to.equal(initialStock - 1);",
+                  "    pm.expect(jsonData.data.allocatedStock).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/addons/{{ADDON_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{ADDON_ID}}"
               ]
             }
           }
@@ -1592,7 +1632,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"car\":\"{{CAR_ID}}\",\"startDate\":\"{{DATE_D30}}\",\"endDate\":\"{{DATE_D32}}\",\"numOfCars\":1}"
+              "raw": "{\"car\":\"{{CREATED_CAR_ID}}\",\"startDate\":\"{{DATE_D30}}\",\"endDate\":\"{{DATE_D32}}\",\"numOfCars\":1}"
             },
             "url": {
               "raw": "{{URL}}/api/v1/bookings",
@@ -1603,6 +1643,156 @@
                 "api",
                 "v1",
                 "bookings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Booking Exceeds Quota by User (Invariant 4 - 400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Rejects update that would exceed 3-car quota for standard user (Invariant 4)', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.include('maximum quota of 3 cars');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{NEW_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numOfCars\":2}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{BOOKING_SAME_DAY_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{BOOKING_SAME_DAY_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin Quota Exemption on Booking Update (Invariant 4 - Admin 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Admin is exempt from 3-car quota when updating bookings (Invariant 4)', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.numOfCars).to.equal(2);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numOfCars\":2}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{BOOKING_SAME_DAY_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{BOOKING_SAME_DAY_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin Reset Booking Cars (PUT /bookings/:id - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Resets booking numOfCars back to 1', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.numOfCars).to.equal(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numOfCars\":1}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{BOOKING_SAME_DAY_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{BOOKING_SAME_DAY_ID}}"
               ]
             }
           }
@@ -1962,6 +2152,44 @@
                 "v1",
                 "bookings",
                 "{{BOOKING_1_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Add-on Stock Restored after Cascade Delete (Invariant 7 - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Invariant 7 verified: Add-on inventory fully restored upon cascade deletion', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const initialStock = Number(pm.environment.get('INITIAL_ADDON_STOCK'));",
+                  "    pm.expect(jsonData.data.availableStock).to.equal(initialStock);",
+                  "    pm.expect(jsonData.data.allocatedStock).to.equal(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/addons/{{ADDON_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{ADDON_ID}}"
               ]
             }
           }
