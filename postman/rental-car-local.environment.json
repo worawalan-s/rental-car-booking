@@ -1,0 +1,91 @@
+{
+  "id": "7b8f9e21-0a44-4e2b-a1e6-348123456789",
+  "name": "Rental Car Local Environment",
+  "values": [
+    {
+      "key": "URL",
+      "value": "http://localhost:5003",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "ADMIN_EMAIL",
+      "value": "admin@rentalcar.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "ADMIN_PASSWORD",
+      "value": "adminpassword",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "USER_EMAIL",
+      "value": "john.doe@example.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "USER_PASSWORD",
+      "value": "userpassword",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "ADMIN_TOKEN",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "USER_TOKEN",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "CAR_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "PROVIDER_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "ADDON_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "CREATED_CAR_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "BOOKING_1_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "BOOKING_2_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "BOOKING_3_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}
