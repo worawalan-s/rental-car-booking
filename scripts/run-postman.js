@@ -12,7 +12,7 @@ const BASE_URL = `http://localhost:${PORT}`;
 // Helper: Check if server is running
 const checkServerRunning = (url) => {
   return new Promise((resolve) => {
-    const req = http.get(`${url}/api/v1/health`, (res) => {
+    const req = http.get(`${url}/api/v1/cars`, (res) => {
       resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));

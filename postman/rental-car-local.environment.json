@@ -45,6 +45,12 @@
       "enabled": true
     },
     {
+      "key": "NEW_USER_TOKEN",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
       "key": "CAR_ID",
       "value": "",
       "type": "default",
@@ -69,6 +75,12 @@
       "enabled": true
     },
     {
+      "key": "CREATED_ADDON_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
       "key": "BOOKING_1_ID",
       "value": "",
       "type": "default",
@@ -82,6 +94,18 @@
     },
     {
       "key": "BOOKING_3_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "BOOKING_SAME_DAY_ID",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "ADMIN_BOOKING_ID",
       "value": "",
       "type": "default",
       "enabled": true

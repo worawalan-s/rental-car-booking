@@ -18,7 +18,12 @@ const router = express.Router();
 router
   .route('/')
   .get(protect, authorize('admin', 'user'), getBookings)
-  .post(protect, authorize('user'), validateBookingPayload, createBooking);
+  .post(
+    protect,
+    authorize('admin', 'user'),
+    validateBookingPayload,
+    createBooking
+  );
 
 router
   .route('/:id')

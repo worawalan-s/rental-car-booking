@@ -8,7 +8,6 @@
     "dev": "nodemon server.js",
     "test": "jest --passWithNoTests --runInBand --detectOpenHandles",
     "test:postman": "node scripts/run-postman.js",
-    "generate:postman": "node scripts/generate-collection.js",
     "seed": "node seeder.js -i",
     "seed:destroy": "node seeder.js -d"
   },
