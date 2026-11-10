@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 const { spawn, execSync } = require('child_process');
 const http = require('http');
@@ -51,9 +50,6 @@ async function main() {
       detached: false,
     });
 
-    serverProcess.stdout.on('data', (data) => {
-      // Optional debug logging
-    });
     serverProcess.stderr.on('data', (data) => {
       process.stderr.write(`[SERVER ERROR] ${data.toString()}`);
     });

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "8c7d6e5a-1b2c-4f3e-9a8b-123456789abc",
     "name": "Rental Car Booking Platform - Stage 1 & 2 Verification Suite",
-    "description": "Course-aligned comprehensive API verification for Rental Car Booking Platform (Stage 1 & Stage 2). Covers Auth, Cars CRUD, Faceted Search (<200ms), Satang Pricing Engine (<100ms), Invariant 6 Same-Day Rental, 3-Car Quota Enforcement & Admin Exemption, Invariant 5 Schedule Collision, Add-ons CRUD, and Invariant 7 Cascade Hard Delete.",
+    "description": "Course-aligned comprehensive API verification for Rental Car Booking Platform (Stage 1 & Stage 2). Covers Auth, Cars CRUD, Faceted Search (<200ms), Satang Pricing Engine (<100ms), Invariant 6 Same-Day Rental, 3-Car Quota Enforcement, Invariant 5 Schedule Collision, Add-ons CRUD & Auth Guards, and Invariant 7 Cascade Hard Delete.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -588,6 +588,104 @@
           }
         },
         {
+          "name": "Create Car Invalid Category (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Rejects invalid vehicle category enum', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"brand\":\"InvalidBrand\",\"model\":\"RocketCar\",\"category\":\"Spaceship\",\"dailyRate\":150000,\"capacity\":5,\"provider\":\"{{PROVIDER_ID}}\"}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/cars",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cars"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Car Negative Daily Rate (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Rejects negative daily rate', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"brand\":\"InvalidRateBrand\",\"model\":\"NegativeRateModel\",\"category\":\"Sedan\",\"dailyRate\":-50000,\"capacity\":5,\"provider\":\"{{PROVIDER_ID}}\"}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/cars",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cars"
+              ]
+            }
+          }
+        },
+        {
           "name": "Create Car as Admin (201 Created)",
           "event": [
             {
@@ -957,21 +1055,161 @@
           }
         },
         {
-          "name": "Create Add-On as Admin (201 Created)",
+          "name": "Create Add-On as User (Forbidden 403 - API_CONTRACTS.md §3.5)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status code is 201 Created', function () {",
-                  "    pm.response.to.have.status(201);",
+                  "pm.test('Status code is 403 Forbidden', function () {",
+                  "    pm.response.to.have.status(403);",
                   "});",
-                  "pm.test('Captures CREATED_ADDON_ID', function () {",
+                  "pm.test('Standard error envelope { success: false, message }', function () {",
                   "    const jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.success).to.be.true;",
-                  "    pm.expect(jsonData.data._id).to.be.a('string');",
-                  "    pm.environment.set('CREATED_ADDON_ID', jsonData.data._id);",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"User AddOn Attempt\",\"category\":\"Equipment\",\"dailyRate\":15000,\"inventoryStock\":5,\"provider\":\"{{PROVIDER_ID}}\"}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/addons",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Add-On as User (Forbidden 403 - API_CONTRACTS.md §3.5)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 403 Forbidden', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('Standard error envelope { success: false, message }', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"dailyRate\":20000}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/addons/{{ADDON_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{ADDON_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Add-On as User (Forbidden 403 - API_CONTRACTS.md §3.5)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 403 Forbidden', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('Standard error envelope { success: false, message }', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/addons/{{ADDON_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{ADDON_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Add-On Invalid Category (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Rejects invalid add-on category enum', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
                   "});"
                 ]
               }
@@ -991,7 +1229,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"name\":\"Universal Dashcam 4K Postman\",\"category\":\"Equipment\",\"description\":\"Ultra HD wide-angle dashcam with night vision\",\"dailyRate\":12000,\"inventoryStock\":5,\"provider\":\"{{PROVIDER_ID}}\"}"
+              "raw": "{\"name\":\"Invalid AddOn\",\"category\":\"SpaceshipGear\",\"dailyRate\":15000,\"inventoryStock\":5,\"provider\":\"{{PROVIDER_ID}}\"}"
             },
             "url": {
               "raw": "{{URL}}/api/v1/addons",
@@ -1007,27 +1245,27 @@
           }
         },
         {
-          "name": "Update Add-On as Admin (200 OK)",
+          "name": "Create Add-On Negative Daily Rate (400 Bad Request)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status code is 200 OK', function () {",
-                  "    pm.response.to.have.status(200);",
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
                   "});",
-                  "pm.test('Updates dailyRate in Satang', function () {",
+                  "pm.test('Rejects negative daily rate', function () {",
                   "    const jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.success).to.be.true;",
-                  "    pm.expect(jsonData.data.dailyRate).to.eql(15000);",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
                   "});"
                 ]
               }
             }
           ],
           "request": {
-            "method": "PUT",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -1040,59 +1278,17 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"dailyRate\":15000}"
+              "raw": "{\"name\":\"Negative Daily Rate AddOn\",\"category\":\"Equipment\",\"dailyRate\":-100,\"inventoryStock\":5,\"provider\":\"{{PROVIDER_ID}}\"}"
             },
             "url": {
-              "raw": "{{URL}}/api/v1/addons/{{CREATED_ADDON_ID}}",
+              "raw": "{{URL}}/api/v1/addons",
               "host": [
                 "{{URL}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "addons",
-                "{{CREATED_ADDON_ID}}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Delete Add-On as Admin (200 OK)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200 OK', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test('Successfully deleted add-on', function () {",
-                  "    const jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.success).to.be.true;",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ADMIN_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{URL}}/api/v1/addons/{{CREATED_ADDON_ID}}",
-              "host": [
-                "{{URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "addons",
-                "{{CREATED_ADDON_ID}}"
+                "addons"
               ]
             }
           }
@@ -1412,20 +1608,20 @@
           }
         },
         {
-          "name": "Admin Quota Exemption (Invariant 4 - Admin 201 Created)",
+          "name": "Admin Booking Creation Prohibited (Forbidden 403 - API_CONTRACTS.md §3.3)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status code is 201 Created', function () {",
-                  "    pm.response.to.have.status(201);",
+                  "pm.test('Status code is 403 Forbidden', function () {",
+                  "    pm.response.to.have.status(403);",
                   "});",
-                  "pm.test('Admin is exempt from 3-car quota limit (Invariant 4)', function () {",
+                  "pm.test('API_CONTRACTS.md §3.3 verified: Admins cannot create bookings', function () {",
                   "    const jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.success).to.be.true;",
-                  "    pm.environment.set('ADMIN_BOOKING_ID', jsonData.data._id);",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
                   "});"
                 ]
               }
@@ -1646,47 +1842,6 @@
                 "v1",
                 "bookings",
                 "{{BOOKING_SAME_DAY_ID}}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Delete Admin Booking (200 OK)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200 OK', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test('Successfully deletes admin booking', function () {",
-                  "    const jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.success).to.be.true;",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ADMIN_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{URL}}/api/v1/bookings/{{ADMIN_BOOKING_ID}}",
-              "host": [
-                "{{URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{ADMIN_BOOKING_ID}}"
               ]
             }
           }
