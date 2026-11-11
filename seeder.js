@@ -11,6 +11,7 @@ const Provider = require('./models/Provider');
 const Car = require('./models/Car');
 const User = require('./models/User');
 const Booking = require('./models/Booking');
+const AddOn = require('./models/AddOn');
 
 // Database connection helper
 const connectDB = async () => {
@@ -35,6 +36,9 @@ const users = JSON.parse(
 const bookings = JSON.parse(
   fs.readFileSync(path.join(__dirname, '_data', 'bookings.json'), 'utf-8')
 );
+const addons = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '_data', 'addons.json'), 'utf-8')
+);
 
 // Import all data into database with dynamic relational linking
 const importData = async () => {
@@ -49,6 +53,7 @@ const importData = async () => {
 
     // 1. Wipe existing data in reverse dependency order to prevent duplicate keys
     await Booking.deleteMany();
+    await AddOn.deleteMany();
     await Car.deleteMany();
     await Provider.deleteMany();
     await User.deleteMany();
@@ -57,6 +62,19 @@ const importData = async () => {
     // 2. Create Providers
     const createdProviders = await Provider.create(providers);
     console.log(`✓ ${createdProviders.length} Providers imported`);
+
+    // 2.1 Create AddOns dynamically mapped across providers
+    const addonsWithProviders = [];
+    createdProviders.forEach((prov) => {
+      addons.forEach((addon) => {
+        addonsWithProviders.push({
+          ...addon,
+          provider: prov._id,
+        });
+      });
+    });
+    const createdAddOns = await AddOn.create(addonsWithProviders);
+    console.log(`✓ ${createdAddOns.length} AddOns imported across providers`);
 
     // 3. Map real Provider ObjectIds dynamically into Cars
     const carsWithProviders = cars.map((car, index) => {
@@ -117,6 +135,7 @@ const destroyData = async () => {
     await connectDB();
 
     await Booking.deleteMany();
+    await AddOn.deleteMany();
     await Car.deleteMany();
     await Provider.deleteMany();
     await User.deleteMany();
