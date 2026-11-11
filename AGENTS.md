@@ -91,3 +91,21 @@ We employ a disciplined Git strategy to enable seamless collaboration between Mi
 3. **Database Seeding**:
    - Use `npm run seed` (`node seeder.js -i`) to refresh mock data in MongoDB Atlas.
    - Use `npm run seed:destroy` (`node seeder.js -d`) to wipe collections safely.
+
+---
+
+## 5. Assignment 12 Alignment & Partner Boundary Conventions
+
+To maintain 100% compliance with the instructor's latest **Assignment 12 (`VacQ`)** reference architecture, the following conventions and boundaries are established between Minnie (Dev 1) and Praise (Dev 2):
+
+1. **Query Parser Setting**:
+   - In `server.js`, `app.set('query parser', 'extended');` MUST be configured so bracketed query filters (`dailyRate[lte]=200000`) parse correctly into MongoDB filter objects.
+2. **Security Middleware Chain (Praise Scope - Task 15 / Issue #27)**:
+   - Ordering in `server.js` MUST strictly follow: `express.json()` -> `mongoSanitize()` -> `helmet()` -> `xss()` -> `rateLimit({ windowMs: 10 * 60 * 1000, max: 100 })` -> `hpp()` -> `cors()` -> `cookieParser()`.
+3. **OpenAPI / Swagger Documentation (Praise Scope - Task 17 / Issue #24)**:
+   - Use `swagger-jsdoc` and `swagger-ui-express` mounted at `/api-docs`.
+   - `swaggerDefinition` MUST specify `openapi: '3.0.0'` with server URL `http://localhost:5003/api/v1` and scan paths `['./routes/*.js']`.
+4. **Token Validation Guard**:
+   - Authentication middleware `protect` checks both `!token` and literal strings `'none'` and `'null'` (`if (!token || token === 'none' || token === 'null')`).
+5. **Two-Key Error Response Uniformity**:
+   - Every error response across all endpoints (Auth, Cars, Bookings, Providers, AddOns) MUST return `{ success: false, message: '...' }` with zero database stack trace leaks.
