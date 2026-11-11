@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Car = require('../models/Car');
 const Provider = require('../models/Provider');
 const Booking = require('../models/Booking');
+const redisClient = require('../config/redis');
 
 // @desc      Get all cars
 // @route     GET /api/v1/cars
@@ -153,6 +154,9 @@ exports.createCar = async (req, res, next) => {
 
     const car = await Car.create(req.body);
 
+    // Invalidate provider cache as populated cars changed
+    await redisClient.clearPattern('providers:*');
+
     res.status(201).json({
       success: true,
       data: car,
@@ -189,6 +193,9 @@ exports.updateCar = async (req, res, next) => {
       });
     }
 
+    // Invalidate provider cache as populated cars changed
+    await redisClient.clearPattern('providers:*');
+
     res.status(200).json({
       success: true,
       data: car,
@@ -215,6 +222,9 @@ exports.deleteCar = async (req, res, next) => {
     // Cascade delete associated bookings (Assignment 7.2 pattern)
     await Booking.deleteMany({ car: req.params.id });
     await Car.deleteOne({ _id: req.params.id });
+
+    // Invalidate provider cache as populated cars changed
+    await redisClient.clearPattern('providers:*');
 
     res.status(200).json({
       success: true,

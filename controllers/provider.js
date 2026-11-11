@@ -1,6 +1,7 @@
 const Provider = require("../models/Provider");
 const Car = require("../models/Car");
 const Booking = require("../models/Booking");
+const redisClient = require("../config/redis");
 
 // Helper to format clean, safe error messages without leaking database internals
 const formatProviderError = (err, req) => {
@@ -23,6 +24,17 @@ const formatProviderError = (err, req) => {
 // @access   Public
 exports.getProviders = async (req, res, next) => {
   try {
+    // Cache-aside: deterministic key from sorted query params
+    const sortedQueryEntries = Object.keys(req.query)
+      .sort()
+      .map((k) => [k, req.query[k]]);
+    const cacheKey = `providers:list:${JSON.stringify(sortedQueryEntries)}`;
+
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
+
     let query;
 
     // Copy req.query
@@ -88,12 +100,17 @@ exports.getProviders = async (req, res, next) => {
       };
     }
 
-    res.status(200).json({
+    const responsePayload = {
       success: true,
       count: providers.length,
       pagination,
       data: providers,
-    });
+    };
+
+    // Store in Redis with TTL
+    await redisClient.set(cacheKey, responsePayload);
+
+    res.status(200).json(responsePayload);
   } catch (err) {
     res.status(400).json({
       success: false,
@@ -107,6 +124,12 @@ exports.getProviders = async (req, res, next) => {
 // @access   Public
 exports.getProvider = async (req, res, next) => {
   try {
+    const cacheKey = `providers:single:${req.params.id}`;
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
+
     const provider = await Provider.findById(req.params.id).populate("cars");
 
     if (!provider) {
@@ -116,7 +139,10 @@ exports.getProvider = async (req, res, next) => {
       });
     }
 
-    res.status(200).json({ success: true, data: provider });
+    const responsePayload = { success: true, data: provider };
+    await redisClient.set(cacheKey, responsePayload);
+
+    res.status(200).json(responsePayload);
   } catch (err) {
     res.status(400).json({
       success: false,
@@ -131,6 +157,10 @@ exports.getProvider = async (req, res, next) => {
 exports.createProvider = async (req, res, next) => {
   try {
     const provider = await Provider.create(req.body);
+
+    // Invalidate provider cache on creation
+    await redisClient.clearPattern("providers:*");
+
     res.status(201).json({ success: true, data: provider });
   } catch (err) {
     res.status(400).json({
@@ -156,6 +186,9 @@ exports.updateProvider = async (req, res, next) => {
         message: `Provider not found with id of ${req.params.id}`,
       });
     }
+
+    // Invalidate provider cache on update
+    await redisClient.clearPattern("providers:*");
 
     res.status(200).json({ success: true, data: provider });
   } catch (err) {
@@ -184,6 +217,9 @@ exports.deleteProvider = async (req, res, next) => {
     await Booking.deleteMany({ provider: req.params.id });
     await Car.deleteMany({ provider: req.params.id });
     await Provider.deleteOne({ _id: req.params.id });
+
+    // Invalidate provider cache on deletion
+    await redisClient.clearPattern("providers:*");
 
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
