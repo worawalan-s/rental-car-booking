@@ -1,18 +1,18 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const cookieParser = require('cookie-parser');
-const connectDB = require('./config/db');
+const express = require("express");
+const dotenv = require("dotenv");
+const cookieParser = require("cookie-parser");
+const connectDB = require("./config/db");
 
 // Load env vars
-dotenv.config({ path: './config/config.env' });
+dotenv.config({ path: "./config/config.env" });
 
 // Verify critical environment variables
 if (
-  process.env.NODE_ENV !== 'test' &&
+  process.env.NODE_ENV !== "test" &&
   (!process.env.JWT_SECRET || !process.env.JWT_EXPIRE)
 ) {
   console.error(
-    'FATAL ERROR: JWT_SECRET or JWT_EXPIRE environment variable is not defined.'
+    "FATAL ERROR: JWT_SECRET or JWT_EXPIRE environment variable is not defined.",
   );
   process.exit(1);
 }
@@ -29,39 +29,41 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Query parser
-app.set('query parser', 'extended');
+app.set("query parser", "extended");
 
 // Route files
-const auth = require('./routes/auth');
-const cars = require('./routes/cars');
-const bookings = require('./routes/bookings');
-const pricing = require('./routes/pricing');
+const auth = require("./routes/auth");
+const cars = require("./routes/cars");
+const bookings = require("./routes/bookings");
+const pricing = require("./routes/pricing");
+const provider = require("./routes/provider");
 
 // Base health check
-app.get('/api/v1/health', (req, res) => {
+app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Rental Car Booking API is running',
+    message: "Rental Car Booking API is running",
   });
 });
 
 // Mount routers
-app.use('/api/v1/auth', auth);
-app.use('/api/v1/cars', cars);
-app.use('/api/v1/bookings', bookings);
-app.use('/api/v1/pricing', pricing);
+app.use("/api/v1/auth", auth);
+app.use("/api/v1/cars", cars);
+app.use("/api/v1/bookings", bookings);
+app.use("/api/v1/pricing", pricing);
+app.use("/api/v1/providers", provider);
 
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(
   PORT,
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`)
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`),
 );
 
 app.server = server;
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
+process.on("unhandledRejection", (err, promise) => {
   console.log(`Error: ${err.message}`);
   server.close(() => process.exit(1));
 });
