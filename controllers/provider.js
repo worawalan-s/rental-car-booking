@@ -1,6 +1,8 @@
+const mongoose = require("mongoose");
 const Provider = require("../models/Provider");
 const Car = require("../models/Car");
 const Booking = require("../models/Booking");
+const AddOn = require("../models/AddOn");
 const redisClient = require("../config/redis");
 
 // Helper to format clean, safe error messages without leaking database internals
@@ -16,7 +18,7 @@ const formatProviderError = (err, req) => {
       .map((val) => val.message)
       .join(", ");
   }
-  return err.message || "An unexpected error occurred";
+  return "An unexpected error occurred";
 };
 
 // @desc     Get all providers
@@ -37,14 +39,18 @@ exports.getProviders = async (req, res, next) => {
 
     let query;
 
-    // Copy req.query
-    const reqQuery = { ...req.query };
-
-    // Fields to exclude
-    const removeFields = ["select", "sort", "page", "limit"];
-
-    // Loop over remove fields and delete them from reqQuery
-    removeFields.forEach((param) => delete reqQuery[param]);
+    // Whitelist allowed filter fields and strip $ / __proto__ keys (matches controllers/cars.js)
+    const ALLOWED_FILTER_FIELDS = ["name", "address", "tel"];
+    const reqQuery = {};
+    for (const [key, value] of Object.entries(req.query)) {
+      if (
+        !key.startsWith("$") &&
+        key !== "__proto__" &&
+        ALLOWED_FILTER_FIELDS.includes(key)
+      ) {
+        reqQuery[key] = value;
+      }
+    }
 
     // Create query string
     let queryStr = JSON.stringify(reqQuery);
@@ -72,9 +78,10 @@ exports.getProviders = async (req, res, next) => {
       query = query.sort("-createdAt");
     }
 
-    // Pagination with safe boundaries
+    // Pagination with safe boundaries (cap limit between 1 and 50)
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.max(parseInt(req.query.limit, 10) || 25, 1);
+    const rawLimit = parseInt(req.query.limit, 10) || 25;
+    const limit = Math.min(Math.max(rawLimit, 1), 50);
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
     const total = await Provider.countDocuments(parsedQuery);
@@ -203,29 +210,39 @@ exports.updateProvider = async (req, res, next) => {
 // @route    DELETE /api/v1/providers/:id
 // @access   Private (Admin only)
 exports.deleteProvider = async (req, res, next) => {
+  const session = await mongoose.startSession();
   try {
-    const provider = await Provider.findById(req.params.id);
+    session.startTransaction();
+
+    const provider = await Provider.findById(req.params.id).session(session);
 
     if (!provider) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: `Provider not found with id of ${req.params.id}`,
       });
     }
 
-    // Cascade delete bookings and cars belonging to this provider
-    await Booking.deleteMany({ provider: req.params.id });
-    await Car.deleteMany({ provider: req.params.id });
-    await Provider.deleteOne({ _id: req.params.id });
+    // Cascade delete bookings, add-ons, and cars belonging to this provider atomically
+    await Booking.deleteMany({ provider: req.params.id }, { session });
+    await AddOn.deleteMany({ provider: req.params.id }, { session });
+    await Car.deleteMany({ provider: req.params.id }, { session });
+    await Provider.deleteOne({ _id: req.params.id }, { session });
+
+    await session.commitTransaction();
 
     // Invalidate provider cache on deletion
     await redisClient.clearPattern("providers:*");
 
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
+    await session.abortTransaction();
     res.status(400).json({
       success: false,
       message: formatProviderError(err, req),
     });
+  } finally {
+    session.endSession();
   }
 };

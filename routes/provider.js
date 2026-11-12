@@ -10,6 +10,7 @@ const {
 const router = express.Router();
 const { protect, authorize } = require("../middleware/auth");
 const {
+  validateObjectId,
   validateProviderPayload,
   validateProviderUpdate,
 } = require("../middleware/validate");
@@ -21,8 +22,19 @@ router
 
 router
   .route("/:id")
-  .get(getProvider)
-  .put(protect, authorize("admin"), validateProviderUpdate, updateProvider)
-  .delete(protect, authorize("admin"), deleteProvider);
+  .get(validateObjectId("id", "provider ID"), getProvider)
+  .put(
+    protect,
+    authorize("admin"),
+    validateObjectId("id", "provider ID"),
+    validateProviderUpdate,
+    updateProvider
+  )
+  .delete(
+    protect,
+    authorize("admin"),
+    validateObjectId("id", "provider ID"),
+    deleteProvider
+  );
 
 module.exports = router;
