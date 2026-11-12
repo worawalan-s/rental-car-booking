@@ -50,7 +50,12 @@ const BookingSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: [0, 'Total price cannot be negative'],
-    // Stored as Integer in Satang (cents) for Fixed-point arithmetic precision (Req 3)
+    validate: {
+      validator: function (v) {
+        return v === undefined || v === null || Number.isInteger(v);
+      },
+      message: 'Total price must be an integer in Satang',
+    },
   },
   addOns: [
     {
@@ -65,7 +70,14 @@ const BookingSchema = new mongoose.Schema({
       },
       price: {
         type: Number,
-        default: 0, // In Satang
+        default: 0,
+        min: [0, 'Add-on price cannot be negative'],
+        validate: {
+          validator: function (v) {
+            return v === undefined || v === null || Number.isInteger(v);
+          },
+          message: 'Add-on price must be an integer in Satang',
+        },
       },
     },
   ],
