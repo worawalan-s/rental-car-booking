@@ -7,3 +7,11 @@ config/config.env
 .DS_Store
 coverage
 npm-debug.log*
+
+# Uploads
+public/uploads/*
+!public/uploads/**/.gitkeep
+
+# Logs
+logs/
+*.log

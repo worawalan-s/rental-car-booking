@@ -52,6 +52,12 @@ const UserSchema = new mongoose.Schema({
     idNumber: { type: String, trim: true },
     imageUrl: { type: String, trim: true },
     verified: { type: Boolean, default: false },
+    uploadedAt: { type: Date },
+    verificationStatus: {
+      type: String,
+      enum: ['NotUploaded', 'Pending', 'Verified', 'Rejected'],
+      default: 'NotUploaded',
+    },
   },
   createdAt: {
     type: Date,

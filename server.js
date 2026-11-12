@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
@@ -24,6 +25,9 @@ const app = express();
 
 // Body parser
 app.use(express.json());
+
+// Set static folder for uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // Cookie parser
 app.use(cookieParser());
