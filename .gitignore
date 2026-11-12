@@ -7,7 +7,7 @@ config/config.env
 .DS_Store
 coverage
 npm-debug.log*
-
 # log files
 logs
 *.log
+postman/newman-report.json
