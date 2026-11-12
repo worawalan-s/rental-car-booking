@@ -2,11 +2,41 @@ const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const Car = require('../models/Car');
 const AddOn = require('../models/AddOn');
-const User = require('../models/User');
 const { calculateDurationDays } = require('../utils/date');
 const { calculateBaselinePrice } = require('../utils/pricingCalculator');
 const { calculateActiveCars, isQuotaExceeded } = require('../utils/quota');
 const { releaseBookingAddOns } = require('../utils/bookingInventory');
+
+/**
+ * Checks whether an optional nested req.params.carId is a valid ObjectId;
+ * writes a 400 two-key error response and returns true if invalid.
+ */
+const isInvalidNestedCarId = (req, res) => {
+  if (
+    req.params &&
+    req.params.carId &&
+    !mongoose.Types.ObjectId.isValid(req.params.carId)
+  ) {
+    res.status(400).json({
+      success: false,
+      message: `Resource not found with id of ${req.params.carId}`,
+    });
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Checks whether a booking belongs to req.params.carId when accessed via nested route.
+ */
+const bookingMatchesNestedCar = (req, booking) => {
+  if (!req.params || !req.params.carId) return true;
+  const actualCarId =
+    booking.car && booking.car._id
+      ? booking.car._id.toString()
+      : booking.car.toString();
+  return actualCarId === req.params.carId;
+};
 
 /**
  * Checks if a vehicle has an overlapping active reservation (AGENTS.md Invariant 5).
@@ -76,7 +106,8 @@ exports.createBooking = async (req, res, next) => {
     }
 
     // 1. Validate car existence and rental availability (car presence verified by middleware)
-    const car = await Car.findById(req.body.car).session(session);
+    const targetCarId = req.params.carId || req.body.car;
+    const car = await Car.findById(targetCarId).session(session);
     if (!car) {
       await session.abortTransaction();
       return res.status(404).json({
@@ -154,7 +185,7 @@ exports.createBooking = async (req, res, next) => {
             },
           },
           {
-            new: true,
+            returnDocument: 'after',
             session,
             runValidators: true,
           }
@@ -238,8 +269,13 @@ exports.createBooking = async (req, res, next) => {
 exports.getBookings = async (req, res, next) => {
   let query;
 
-  // Filter by status if provided in query (Issue #20)
+  // Filter by status or nested carId if provided (Issue #15, #20)
+  if (isInvalidNestedCarId(req, res)) return;
+
   const filter = {};
+  if (req.params && req.params.carId) {
+    filter.car = req.params.carId;
+  }
   if (req.query.status) {
     filter.status = req.query.status;
   }
@@ -301,6 +337,7 @@ exports.getBookings = async (req, res, next) => {
  * @access  Private (User & Admin)
  */
 exports.getBooking = async (req, res, next) => {
+  if (isInvalidNestedCarId(req, res)) return;
   try {
     const booking = await Booking.findById(req.params.id)
       .populate({
@@ -316,7 +353,7 @@ exports.getBooking = async (req, res, next) => {
         select: 'name category dailyRate',
       });
 
-    if (!booking) {
+    if (!booking || !bookingMatchesNestedCar(req, booking)) {
       return res.status(404).json({
         success: false,
         message: `No booking found with id of ${req.params.id}`,
@@ -343,13 +380,14 @@ exports.getBooking = async (req, res, next) => {
  * @access  Private (User & Admin)
  */
 exports.updateBooking = async (req, res, next) => {
+  if (isInvalidNestedCarId(req, res)) return;
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
 
     let booking = await Booking.findById(req.params.id).session(session);
 
-    if (!booking) {
+    if (!booking || !bookingMatchesNestedCar(req, booking)) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,
@@ -402,11 +440,8 @@ exports.updateBooking = async (req, res, next) => {
         });
       }
 
-      // Check quota based on booking renter (owner) role
-      const bookingOwner = await User.findById(booking.user).session(session);
-      const isOwnerAdmin = bookingOwner && bookingOwner.role === 'admin';
-
-      if (!isOwnerAdmin) {
+      // Admins managing/updating bookings on behalf of users are exempt from the 3-car quota (AGENTS.md §2.4)
+      if (req.user.role !== 'admin') {
         const activeBookings = await Booking.find({
           user: booking.user,
           _id: { $ne: req.params.id },
@@ -502,7 +537,7 @@ exports.updateBooking = async (req, res, next) => {
     }
 
     booking = await Booking.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
+      returnDocument: 'after',
       session,
       runValidators: true,
     });
@@ -544,13 +579,14 @@ exports.updateBooking = async (req, res, next) => {
  * @access  Private (User & Admin)
  */
 exports.deleteBooking = async (req, res, next) => {
+  if (isInvalidNestedCarId(req, res)) return;
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
 
     const booking = await Booking.findById(req.params.id).session(session);
 
-    if (!booking) {
+    if (!booking || !bookingMatchesNestedCar(req, booking)) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,

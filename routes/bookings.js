@@ -13,7 +13,7 @@ const {
   validateBookingUpdateDates,
 } = require('../middleware/validate');
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
 router
   .route('/')

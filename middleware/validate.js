@@ -173,12 +173,17 @@ const validateBookingUpdateDates = (req, res, next) => {
  */
 const validateBookingPayload = (req, res, next) => {
   const { car, provider, numOfCars, addOns } = req.body || {};
+  const carId = (req.params && req.params.carId) || car;
 
-  if (!car || !isValidObjectId(car)) {
+  if (!carId || !isValidObjectId(carId)) {
     return res.status(400).json({
       success: false,
       message: 'Please provide a valid car ID',
     });
+  }
+
+  if (req.params && req.params.carId) {
+    req.body = { ...req.body, car: req.params.carId };
   }
 
   if (provider !== undefined && !isValidObjectId(provider)) {

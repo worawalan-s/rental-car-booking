@@ -104,7 +104,7 @@ exports.getCars = async (req, res, next) => {
       data: cars,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    return handleCarError(res, err, 'Cannot retrieve cars');
   }
 };
 
@@ -132,7 +132,7 @@ exports.getCar = async (req, res, next) => {
       data: car,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    return handleCarError(res, err, 'Cannot retrieve or update car');
   }
 };
 
@@ -159,9 +159,36 @@ exports.createCar = async (req, res, next) => {
       data: car,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    return handleCarError(res, err, 'Cannot create car');
   }
 };
+
+/**
+ * Standardizes Mongoose ValidationError, CastError, duplicate key, and 500 error responses for car endpoints
+ * without leaking raw database error strings or stack traces.
+ */
+function handleCarError(res, err, fallbackMessage = 'Car request failed') {
+  if (err.name === 'ValidationError' && err.errors) {
+    const message = Object.values(err.errors)
+      .map((val) => val.message)
+      .join(', ');
+    return res.status(400).json({ success: false, message });
+  }
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      message: `Resource not found with id of ${err.value}`,
+    });
+  }
+  if (err.code === 11000) {
+    return res.status(400).json({
+      success: false,
+      message: 'Duplicate field value entered',
+    });
+  }
+
+  return res.status(500).json({ success: false, message: fallbackMessage });
+}
 
 // @desc      Update car
 // @route     PUT /api/v1/cars/:id
@@ -195,7 +222,7 @@ exports.updateCar = async (req, res, next) => {
       data: car,
     });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    return handleCarError(res, err, 'Cannot retrieve or update car');
   }
 };
 
@@ -239,13 +266,7 @@ exports.deleteCar = async (req, res, next) => {
     });
   } catch (err) {
     await session.abortTransaction();
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: `Resource not found with id of ${err.value}`,
-      });
-    }
-    res.status(500).json({ success: false, message: 'Cannot delete car' });
+    return handleCarError(res, err, 'Cannot delete car');
   } finally {
     session.endSession();
   }
