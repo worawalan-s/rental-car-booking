@@ -280,6 +280,10 @@ const validateProviderPayload = (req, res, next) => {
   req.body.address = address.trim();
   req.body.tel = tel.trim();
 
+  next();
+};
+
+/**
  * Validates request route parameter as a valid MongoDB ObjectId.
  */
 const validateObjectId = (paramName = 'id', resourceName) => (req, res, next) => {
@@ -335,6 +339,10 @@ const validateProviderUpdate = (req, res, next) => {
     req.body.tel = tel.trim();
   }
 
+  next();
+};
+
+/**
  * Validates optional request query parameter as a valid MongoDB ObjectId if provided.
  */
 const validateQueryObjectId = (queryName = 'provider', resourceName) => (req, res, next) => {
