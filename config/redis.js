@@ -63,10 +63,12 @@ class RedisService {
       this.isConnected = false;
     });
 
-    // Attempt non-blocking initial connection
-    this.client.connect().catch(() => {
-      // Handled by 'error' listener above
-    });
+    // Attempt non-blocking initial connection outside of test environment
+    if (process.env.NODE_ENV !== 'test') {
+      this.client.connect().catch(() => {
+        // Handled by 'error' listener above
+      });
+    }
   }
 
   /**
