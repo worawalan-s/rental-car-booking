@@ -2,10 +2,51 @@ const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const Car = require('../models/Car');
 const AddOn = require('../models/AddOn');
+const User = require('../models/User');
 const { calculateDurationDays } = require('../utils/date');
 const { calculateBaselinePrice } = require('../utils/pricingCalculator');
-const { calculateActiveCars } = require('../utils/quota');
+const { calculateActiveCars, isQuotaExceeded } = require('../utils/quota');
 const { releaseBookingAddOns } = require('../utils/bookingInventory');
+
+/**
+ * Checks if a vehicle has an overlapping active reservation (AGENTS.md Invariant 5).
+ * Leverages the compound index { car: 1, startDate: 1, endDate: 1 } for high-performance lookup.
+ * Formula: Existing startDate < newEndDate AND Existing endDate > newStartDate
+ *
+ * @param {Object} params
+ * @param {ObjectId|string} params.carId - The vehicle ID
+ * @param {Date|string} params.startDate - Rental start date
+ * @param {Date|string} params.endDate - Rental return date
+ * @param {ObjectId|string} [params.excludeBookingId] - Optional booking ID to exclude (for updates)
+ * @param {import('mongoose').ClientSession} [params.session] - Optional Mongoose transaction session
+ * @returns {Promise<boolean>} True if an active collision exists
+ */
+const checkBookingCollision = async ({
+  carId,
+  startDate,
+  endDate,
+  excludeBookingId = null,
+  session = null,
+}) => {
+  const query = {
+    car: carId,
+    status: { $in: ['Pending', 'Confirmed', 'Active'] },
+    startDate: { $lt: new Date(endDate) },
+    endDate: { $gt: new Date(startDate) },
+  };
+
+  if (excludeBookingId) {
+    query._id = { $ne: excludeBookingId };
+  }
+
+  const queryBuilder = Booking.findOne(query);
+  if (session) {
+    queryBuilder.session(session);
+  }
+
+  const existingBooking = await queryBuilder;
+  return Boolean(existingBooking);
+};
 
 /**
  * @desc    Create new booking with atomic add-on pessimistic locking & ACID transaction
@@ -17,6 +58,22 @@ exports.createBooking = async (req, res, next) => {
 
   try {
     session.startTransaction();
+
+    // Validate requested cars payload strictly (integer 1-3)
+    const requestedCars =
+      req.body.numOfCars !== undefined ? req.body.numOfCars : 1;
+    if (
+      typeof requestedCars !== 'number' ||
+      !Number.isInteger(requestedCars) ||
+      requestedCars < 1 ||
+      requestedCars > 3
+    ) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Number of cars must be an integer between 1 and 3',
+      });
+    }
 
     // 1. Validate car existence and rental availability (car presence verified by middleware)
     const car = await Car.findById(req.body.car).session(session);
@@ -36,13 +93,13 @@ exports.createBooking = async (req, res, next) => {
       });
     }
 
-    // 2. Schedule collision prevention (AGENTS.md Invariant 5) within session
-    const collision = await Booking.findOne({
-      car: car._id,
-      status: { $in: ['Pending', 'Confirmed', 'Active'] },
-      startDate: { $lt: req.body.endDate },
-      endDate: { $gt: req.body.startDate },
-    }).session(session);
+    // 2. Schedule collision prevention using compound index { car: 1, startDate: 1, endDate: 1 }
+    const collision = await checkBookingCollision({
+      carId: car._id,
+      startDate: req.body.startDate,
+      endDate: req.body.endDate,
+      session,
+    });
 
     if (collision) {
       await session.abortTransaction();
@@ -59,20 +116,21 @@ exports.createBooking = async (req, res, next) => {
     req.body.user = req.user.id;
 
     // 5. Enforce 3-car quota limit across active reservations (sum of numOfCars) within session
-    const activeBookings = await Booking.find({
-      user: req.user.id,
-      status: { $in: ['Pending', 'Confirmed', 'Active'] },
-    }).session(session);
+    if (req.user.role !== 'admin') {
+      const activeBookings = await Booking.find({
+        user: req.user.id,
+        status: { $in: ['Pending', 'Confirmed', 'Active'] },
+      }).session(session);
 
-    const activeCarsSum = calculateActiveCars(activeBookings);
-    const requestedCars = req.body.numOfCars || 1;
+      const activeCarsSum = calculateActiveCars(activeBookings);
 
-    if (activeCarsSum + requestedCars > 3) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: `User with ID ${req.user.id} has already reached the maximum quota of 3 cars`,
-      });
+      if (isQuotaExceeded(activeCarsSum, requestedCars)) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `User with ID ${req.user.id} has already reached the maximum quota of 3 cars`,
+        });
+      }
     }
 
     // 6. Atomic Add-on Pessimistic Reservation with Compare-and-Swap (CAS)
@@ -343,23 +401,27 @@ exports.updateBooking = async (req, res, next) => {
           message: 'Number of cars must be an integer between 1 and 3',
         });
       }
-    }
 
-    if (req.user.role !== 'admin' && req.body.numOfCars !== undefined) {
-      const activeBookings = await Booking.find({
-        user: req.user.id,
-        _id: { $ne: req.params.id },
-        status: { $in: ['Pending', 'Confirmed', 'Active'] },
-      }).session(session);
+      // Check quota based on booking renter (owner) role
+      const bookingOwner = await User.findById(booking.user).session(session);
+      const isOwnerAdmin = bookingOwner && bookingOwner.role === 'admin';
 
-      const activeCarsSum = calculateActiveCars(activeBookings);
+      if (!isOwnerAdmin) {
+        const activeBookings = await Booking.find({
+          user: booking.user,
+          _id: { $ne: req.params.id },
+          status: { $in: ['Pending', 'Confirmed', 'Active'] },
+        }).session(session);
 
-      if (activeCarsSum + req.body.numOfCars > 3) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          message: `User with ID ${req.user.id} has already reached the maximum quota of 3 cars`,
-        });
+        const activeCarsSum = calculateActiveCars(activeBookings);
+
+        if (isQuotaExceeded(activeCarsSum, req.body.numOfCars)) {
+          await session.abortTransaction();
+          return res.status(400).json({
+            success: false,
+            message: `User with ID ${booking.user} has already reached the maximum quota of 3 cars`,
+          });
+        }
       }
     }
 
@@ -384,15 +446,15 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
-    // If dates are modified, enforce Schedule Collision Prevention (AGENTS.md Invariant 5)
+    // If dates are modified, enforce Schedule Collision Prevention using compound index { car: 1, startDate: 1, endDate: 1 }
     if (req.body.startDate || req.body.endDate) {
-      const collision = await Booking.findOne({
-        car: booking.car,
-        _id: { $ne: booking._id },
-        status: { $in: ['Pending', 'Confirmed', 'Active'] },
-        startDate: { $lt: endDate },
-        endDate: { $gt: startDate },
-      }).session(session);
+      const collision = await checkBookingCollision({
+        carId: booking.car,
+        startDate,
+        endDate,
+        excludeBookingId: booking._id,
+        session,
+      });
 
       if (collision) {
         await session.abortTransaction();
