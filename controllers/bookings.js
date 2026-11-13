@@ -8,6 +8,38 @@ const { calculateActiveCars, isQuotaExceeded } = require('../utils/quota');
 const { releaseBookingAddOns } = require('../utils/bookingInventory');
 
 /**
+ * Standardizes Mongoose ValidationError, CastError, and 500 error responses for booking endpoints
+ * without leaking internal database error strings or stack traces.
+ */
+const handleBookingError = (res, err, fallbackMessage = 'Booking request failed') => {
+  if (err.name === 'ValidationError' && err.errors) {
+    const message = Object.values(err.errors)
+      .map((val) => val.message)
+      .join(', ');
+    return res.status(400).json({ success: false, message });
+  }
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      message: `Resource not found with id of ${err.value}`,
+    });
+  }
+  return res.status(500).json({ success: false, message: fallbackMessage });
+};
+
+/**
+ * Checks whether a booking belongs to req.params.carId if accessed via nested route.
+ */
+const bookingMatchesCarParam = (req, booking) => {
+  if (!req.params || !req.params.carId) return true;
+  const bookingCarId =
+    booking.car && booking.car._id
+      ? booking.car._id.toString()
+      : booking.car.toString();
+  return bookingCarId === req.params.carId;
+};
+
+/**
  * Checks if a vehicle has an overlapping active reservation (AGENTS.md Invariant 5).
  * Leverages the compound index { car: 1, startDate: 1, endDate: 1 } for high-performance lookup.
  * Formula: Existing startDate < newEndDate AND Existing endDate > newStartDate
@@ -75,7 +107,8 @@ exports.createBooking = async (req, res, next) => {
     }
 
     // 1. Validate car existence and rental availability (car presence verified by middleware)
-    const targetCarId = req.params.carId || req.body.car;
+    const targetCarId =
+      (req.body && req.body.car) || (req.params && req.params.carId);
     const car = await Car.findById(targetCarId).session(session);
     if (!car) {
       await session.abortTransaction();
@@ -203,28 +236,7 @@ exports.createBooking = async (req, res, next) => {
     });
   } catch (err) {
     await session.abortTransaction();
-
-    if (err.name === 'ValidationError') {
-      const message = Object.values(err.errors)
-        .map((val) => val.message)
-        .join(', ');
-      return res.status(400).json({
-        success: false,
-        message,
-      });
-    }
-
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: `Resource not found with id of ${err.value}`,
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Cannot create Booking',
-    });
+    return handleBookingError(res, err, 'Cannot create Booking');
   } finally {
     session.endSession();
   }
@@ -291,10 +303,7 @@ exports.getBookings = async (req, res, next) => {
       data: bookings,
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: 'Cannot find Booking',
-    });
+    return handleBookingError(res, err, 'Cannot find Booking');
   }
 };
 
@@ -319,7 +328,7 @@ exports.getBooking = async (req, res, next) => {
         select: 'name category dailyRate',
       });
 
-    if (!booking) {
+    if (!booking || !bookingMatchesCarParam(req, booking)) {
       return res.status(404).json({
         success: false,
         message: `No booking found with id of ${req.params.id}`,
@@ -336,13 +345,7 @@ exports.getBooking = async (req, res, next) => {
 
     res.status(200).json({ success: true, data: booking });
   } catch (err) {
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: `Resource not found with id of ${err.value}`,
-      });
-    }
-    res.status(500).json({ success: false, message: 'Cannot find Booking' });
+    return handleBookingError(res, err, 'Cannot find Booking');
   }
 };
 
@@ -358,7 +361,7 @@ exports.updateBooking = async (req, res, next) => {
 
     let booking = await Booking.findById(req.params.id).session(session);
 
-    if (!booking) {
+    if (!booking || !bookingMatchesCarParam(req, booking)) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,
@@ -518,27 +521,7 @@ exports.updateBooking = async (req, res, next) => {
     res.status(200).json({ success: true, data: booking });
   } catch (err) {
     await session.abortTransaction();
-    if (err.name === 'ValidationError') {
-      const message = Object.values(err.errors)
-        .map((val) => val.message)
-        .join(', ');
-      return res.status(400).json({
-        success: false,
-        message,
-      });
-    }
-
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: `Resource not found with id of ${err.value}`,
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Cannot update Booking',
-    });
+    return handleBookingError(res, err, 'Cannot update Booking');
   } finally {
     session.endSession();
   }
@@ -556,7 +539,7 @@ exports.deleteBooking = async (req, res, next) => {
 
     const booking = await Booking.findById(req.params.id).session(session);
 
-    if (!booking) {
+    if (!booking || !bookingMatchesCarParam(req, booking)) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,
@@ -583,16 +566,7 @@ exports.deleteBooking = async (req, res, next) => {
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
     await session.abortTransaction();
-    if (err.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: `Resource not found with id of ${err.value}`,
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Cannot delete Booking',
-    });
+    return handleBookingError(res, err, 'Cannot delete Booking');
   } finally {
     session.endSession();
   }

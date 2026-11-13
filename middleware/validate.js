@@ -196,6 +196,12 @@ const validateBookingPayload = (req, res, next) => {
   }
 
   if (req.params && req.params.carId) {
+    if (car && car !== req.params.carId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Car ID in URL does not match car ID in request body',
+      });
+    }
     req.body = { ...req.body, car: req.params.carId };
   }
 

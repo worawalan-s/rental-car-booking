@@ -157,6 +157,27 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
       expect(req.body.car).toBe(carId);
     });
 
+    it('rejects conflicting car ID between route param and body in validateBookingPayload with 400', () => {
+      const urlCarId = new mongoose.Types.ObjectId().toString();
+      const bodyCarId = new mongoose.Types.ObjectId().toString();
+      const today = new Date().toISOString().split('T')[0];
+      const req = {
+        params: { carId: urlCarId },
+        body: { car: bodyCarId, startDate: today, endDate: today, numOfCars: 1 },
+      };
+      const res = createMockRes();
+      const next = jest.fn();
+
+      validateBookingPayload(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Car ID in URL does not match car ID in request body',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
     it('scopes Booking.find filter by req.params.carId in getBookings', async () => {
       const carId = new mongoose.Types.ObjectId().toString();
       const mockChain = {
@@ -211,6 +232,40 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
         message: `No car found with the id of ${targetCarId}`,
       });
       expect(mockSession.abortTransaction).toHaveBeenCalled();
+    });
+
+    it('returns 404 in getBooking when nested :carId does not match booking.car', async () => {
+      const requestedCarId = new mongoose.Types.ObjectId().toString();
+      const actualCarId = new mongoose.Types.ObjectId().toString();
+      const bookingId = new mongoose.Types.ObjectId().toString();
+
+      const mockBooking = {
+        _id: bookingId,
+        car: { _id: actualCarId },
+        user: { toString: () => 'admin1' },
+      };
+      const chain = {
+        populate: jest.fn().mockReturnValueOnce({
+          populate: jest.fn().mockReturnValueOnce({
+            populate: jest.fn().mockResolvedValueOnce(mockBooking),
+          }),
+        }),
+      };
+      jest.spyOn(Booking, 'findById').mockReturnValue(chain);
+
+      const req = {
+        params: { id: bookingId, carId: requestedCarId },
+        user: { id: 'admin1', role: 'admin' },
+      };
+      const res = createMockRes();
+
+      await getBooking(req, res, jest.fn());
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: `No booking found with id of ${bookingId}`,
+      });
     });
   });
 
