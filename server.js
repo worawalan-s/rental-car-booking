@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
@@ -33,6 +34,9 @@ app.use(cookieParser());
 
 // Query parser
 app.set('query parser', 'extended');
+
+// Set static folder for uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // HTTP request logging (dev console in development, structured file stream otherwise; silent in test)
 if (process.env.NODE_ENV === 'development') {
