@@ -169,16 +169,40 @@ const validateBookingUpdateDates = (req, res, next) => {
 };
 
 /**
+ * Validates optional nested :carId parameter if present in route.
+ */
+const validateNestedCarId = (req, res, next) => {
+  if (req.params && req.params.carId && !isValidObjectId(req.params.carId)) {
+    return res.status(400).json({
+      success: false,
+      message: `Resource not found with id of ${req.params.carId}`,
+    });
+  }
+  next();
+};
+
+/**
  * Validates full booking creation payload (dates, car, provider, numOfCars, addOns).
  */
 const validateBookingPayload = (req, res, next) => {
   const { car, provider, numOfCars, addOns } = req.body || {};
+  const carId = (req.params && req.params.carId) || car;
 
-  if (!car || !isValidObjectId(car)) {
+  if (!carId || !isValidObjectId(carId)) {
     return res.status(400).json({
       success: false,
       message: 'Please provide a valid car ID',
     });
+  }
+
+  if (req.params && req.params.carId) {
+    if (car && car !== req.params.carId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Car ID in URL does not match car ID in request body',
+      });
+    }
+    req.body = { ...req.body, car: req.params.carId };
   }
 
   if (provider !== undefined && !isValidObjectId(provider)) {
@@ -396,6 +420,7 @@ module.exports = {
   validateBookingDates,
   validateBookingUpdateDates,
   validateBookingPayload,
+  validateNestedCarId,
   validateProviderPayload,
   validateProviderUpdate,
   validateObjectId,

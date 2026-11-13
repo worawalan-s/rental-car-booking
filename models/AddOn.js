@@ -78,7 +78,7 @@ const AddOnSchema = new mongoose.Schema(
 );
 
 // Pre-save hook: auto-compute availableStock = inventoryStock - allocatedStock
-AddOnSchema.pre('save', function (next) {
+AddOnSchema.pre('save', function () {
   const currentAllocated = this.allocatedStock || 0;
   if (this.inventoryStock < currentAllocated) {
     const validationError = new mongoose.Error.ValidationError(this);
@@ -87,10 +87,9 @@ AddOnSchema.pre('save', function (next) {
       path: 'inventoryStock',
       value: this.inventoryStock,
     });
-    return next(validationError);
+    throw validationError;
   }
   this.availableStock = this.inventoryStock - currentAllocated;
-  next();
 });
 
 // Compound Indexes for fast provider inventory queries & concurrency checks
