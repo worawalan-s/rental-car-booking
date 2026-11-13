@@ -191,7 +191,7 @@ exports.uploadDriverLicense = async (req, res, next) => {
       user.driverLicense.idNumber = req.body.idNumber.trim();
     }
 
-    await user.save({ validateBeforeSave: false });
+    await user.save();
 
     res.status(200).json({
       success: true,
@@ -200,7 +200,7 @@ exports.uploadDriverLicense = async (req, res, next) => {
   } catch (err) {
     res.status(500).json({
       success: false,
-      message: err.message || 'Server error',
+      message: 'Server error',
     });
   }
 };

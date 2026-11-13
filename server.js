@@ -29,14 +29,14 @@ const app = express();
 // Body parser
 app.use(express.json());
 
-// Set static folder for uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
-
 // Cookie parser
 app.use(cookieParser());
 
 // Query parser
 app.set('query parser', 'extended');
+
+// Set static folder for uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // HTTP request logging (dev console in development, structured file stream otherwise; silent in test)
 if (process.env.NODE_ENV === 'development') {
