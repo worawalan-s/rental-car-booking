@@ -16,13 +16,14 @@ const {
 
 const router = express.Router({ mergeParams: true });
 
+router.use(validateNestedCarId);
+
 router
   .route('/')
-  .get(protect, authorize('admin', 'user'), validateNestedCarId, getBookings)
+  .get(protect, authorize('admin', 'user'), getBookings)
   .post(
     protect,
     authorize('user'),
-    validateNestedCarId,
     validateBookingPayload,
     createBooking
   );

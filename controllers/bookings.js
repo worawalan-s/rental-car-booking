@@ -32,10 +32,10 @@ const handleBookingError = (res, err, fallbackMessage = 'Booking request failed'
  */
 const bookingMatchesCarParam = (req, booking) => {
   if (!req.params || !req.params.carId) return true;
-  const bookingCarId =
-    booking.car && booking.car._id
-      ? booking.car._id.toString()
-      : booking.car.toString();
+  if (!booking || !booking.car) return false;
+  const bookingCarId = booking.car._id
+    ? booking.car._id.toString()
+    : booking.car.toString();
   return bookingCarId === req.params.carId;
 };
 
@@ -235,7 +235,9 @@ exports.createBooking = async (req, res, next) => {
       data: booking,
     });
   } catch (err) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     return handleBookingError(res, err, 'Cannot create Booking');
   } finally {
     session.endSession();
@@ -520,7 +522,9 @@ exports.updateBooking = async (req, res, next) => {
 
     res.status(200).json({ success: true, data: booking });
   } catch (err) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     return handleBookingError(res, err, 'Cannot update Booking');
   } finally {
     session.endSession();
@@ -565,7 +569,9 @@ exports.deleteBooking = async (req, res, next) => {
 
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     return handleBookingError(res, err, 'Cannot delete Booking');
   } finally {
     session.endSession();

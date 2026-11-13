@@ -267,6 +267,47 @@ const validateBookingPayload = (req, res, next) => {
 };
 
 /**
+ * Validates provider creation payload (name, address, tel).
+ */
+const validateProviderPayload = (req, res, next) => {
+  const { name, address, tel } = req.body || {};
+
+  if (!isNonEmptyString(name)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please add a provider name',
+    });
+  }
+
+  if (name.trim().length > 100) {
+    return res.status(400).json({
+      success: false,
+      message: 'Name cannot exceed 100 characters',
+    });
+  }
+
+  if (!isNonEmptyString(address)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please add an address',
+    });
+  }
+
+  if (!isThaiPhone(tel)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please add a valid 10-digit Thai phone number (0xxxxxxxxx)',
+    });
+  }
+
+  req.body.name = name.trim();
+  req.body.address = address.trim();
+  req.body.tel = tel.trim();
+
+  next();
+};
+
+/**
  * Validates request route parameter as a valid MongoDB ObjectId.
  */
 const validateObjectId = (paramName = 'id', resourceName) => (req, res, next) => {
@@ -277,6 +318,51 @@ const validateObjectId = (paramName = 'id', resourceName) => (req, res, next) =>
       message: `Invalid ${label} format: ${req.params[paramName]}`,
     });
   }
+  next();
+};
+
+/**
+ * Validates provider update payload (optional name, address, tel).
+ */
+const validateProviderUpdate = (req, res, next) => {
+  const { name, address, tel } = req.body || {};
+
+  if (name !== undefined) {
+    if (!isNonEmptyString(name)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Provider name cannot be empty',
+      });
+    }
+    if (name.trim().length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name cannot exceed 100 characters',
+      });
+    }
+    req.body.name = name.trim();
+  }
+
+  if (address !== undefined) {
+    if (!isNonEmptyString(address)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Address cannot be empty',
+      });
+    }
+    req.body.address = address.trim();
+  }
+
+  if (tel !== undefined) {
+    if (!isThaiPhone(tel)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please add a valid 10-digit Thai phone number (0xxxxxxxxx)',
+      });
+    }
+    req.body.tel = tel.trim();
+  }
+
   next();
 };
 
@@ -335,6 +421,8 @@ module.exports = {
   validateBookingUpdateDates,
   validateBookingPayload,
   validateNestedCarId,
+  validateProviderPayload,
+  validateProviderUpdate,
   validateObjectId,
   validateQueryObjectId,
   validateAddOnPayload,

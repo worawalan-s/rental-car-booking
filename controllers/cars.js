@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Car = require('../models/Car');
 const Provider = require('../models/Provider');
 const Booking = require('../models/Booking');
+const redisClient = require('../config/redis');
 const { releaseBookingAddOns } = require('../utils/bookingInventory');
 
 // @desc      Get all cars
@@ -154,6 +155,9 @@ exports.createCar = async (req, res, next) => {
 
     const car = await Car.create(req.body);
 
+    // Invalidate provider cache as populated cars changed
+    await redisClient.clearPattern('providers:*');
+
     res.status(201).json({
       success: true,
       data: car,
@@ -217,6 +221,9 @@ exports.updateCar = async (req, res, next) => {
       });
     }
 
+    // Invalidate provider cache as populated cars changed
+    await redisClient.clearPattern('providers:*');
+
     res.status(200).json({
       success: true,
       data: car,
@@ -260,12 +267,17 @@ exports.deleteCar = async (req, res, next) => {
 
     await session.commitTransaction();
 
+    // Invalidate provider cache as populated cars changed
+    await redisClient.clearPattern('providers:*');
+
     res.status(200).json({
       success: true,
       data: {},
     });
   } catch (err) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     return handleCarError(res, err, 'Cannot delete car');
   } finally {
     session.endSession();

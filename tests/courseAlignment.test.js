@@ -267,6 +267,39 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
         message: `No booking found with id of ${bookingId}`,
       });
     });
+
+    it('returns 404 in getBooking when referenced booking.car is null (null-safety guard)', async () => {
+      const requestedCarId = new mongoose.Types.ObjectId().toString();
+      const bookingId = new mongoose.Types.ObjectId().toString();
+
+      const mockBooking = {
+        _id: bookingId,
+        car: null,
+        user: { toString: () => 'admin1' },
+      };
+      const chain = {
+        populate: jest.fn().mockReturnValueOnce({
+          populate: jest.fn().mockReturnValueOnce({
+            populate: jest.fn().mockResolvedValueOnce(mockBooking),
+          }),
+        }),
+      };
+      jest.spyOn(Booking, 'findById').mockReturnValue(chain);
+
+      const req = {
+        params: { id: bookingId, carId: requestedCarId },
+        user: { id: 'admin1', role: 'admin' },
+      };
+      const res = createMockRes();
+
+      await getBooking(req, res, jest.fn());
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: `No booking found with id of ${bookingId}`,
+      });
+    });
   });
 
   describe('Booking Updates: Mongoose 9 Options & Admin Quota Exemption', () => {
