@@ -67,6 +67,8 @@ describe('Task 15: Booking State Machine & Transition Invariants Suite (#22)', (
       expect(isValidStatusTransition('Completed', 'Pending')).toBe(false);
       expect(isValidStatusTransition('Completed', 'Active')).toBe(false);
       expect(isValidStatusTransition('Completed', 'Cancelled')).toBe(false);
+      expect(isValidStatusTransition('Completed', 'Completed')).toBe(false);
+      expect(isValidStatusTransition('Cancelled', 'Cancelled')).toBe(false);
       expect(isValidStatusTransition('Cancelled', 'Pending')).toBe(false);
       expect(isValidStatusTransition('Cancelled', 'Confirmed')).toBe(false);
     });
@@ -93,6 +95,10 @@ describe('Task 15: Booking State Machine & Transition Invariants Suite (#22)', (
       const terminalModRes = validateStatusTransition('Completed', 'Pending');
       expect(terminalModRes.isValid).toBe(false);
       expect(terminalModRes.error).toBe("Cannot modify booking with terminal status of 'Completed'");
+
+      const terminalSelfModRes = validateStatusTransition('Completed', 'Completed');
+      expect(terminalSelfModRes.isValid).toBe(false);
+      expect(terminalSelfModRes.error).toBe("Cannot modify booking with terminal status of 'Completed'");
 
       const regressionRes = validateStatusTransition('Active', 'Pending');
       expect(regressionRes.isValid).toBe(false);

@@ -183,6 +183,44 @@
           }
         },
         {
+          "name": "Logout User via GET (Assignment 12 - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('GET /logout clears auth token cookie', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "    pm.expect(setCookie).to.include('token=none');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/logout",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            }
+          }
+        },
+        {
           "name": "Get Me (Unauthorized - Missing Token)",
           "event": [
             {
@@ -245,6 +283,49 @@
               {
                 "key": "Authorization",
                 "value": "Bearer invalid_or_expired_jwt_token"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/me",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Me (Unauthorized - Literal Bearer null Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Standard failure envelope { success: false, message }', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
+                  "    pm.expect(Object.keys(jsonData)).to.have.members([\"success\", \"message\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer null"
               }
             ],
             "url": {
@@ -487,6 +568,44 @@
                 "v1",
                 "cars",
                 "{{CAR_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Car Invalid ObjectId (CastError 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Two-key error envelope masks internal Mongoose CastError', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.eql('Resource not found with id of invalid_object_id_123');",
+                  "    pm.expect(Object.keys(jsonData)).to.have.members([\"success\", \"message\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/cars/invalid_object_id_123",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cars",
+                "invalid_object_id_123"
               ]
             }
           }
@@ -1294,6 +1413,187 @@
               ]
             }
           }
+        },
+        {
+          "name": "Create Add-On as Admin (201 Created)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Creates add-on, calculates availableStock, and captures CREATED_ADDON_ID', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data._id).to.be.a('string');",
+                  "    pm.expect(jsonData.data.dailyRate).to.eql(25000);",
+                  "    pm.expect(jsonData.data.availableStock).to.eql(10);",
+                  "    pm.environment.set('CREATED_ADDON_ID', jsonData.data._id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Dash Cam Pro Postman\",\"category\":\"Accessory\",\"dailyRate\":25000,\"inventoryStock\":10,\"provider\":\"{{PROVIDER_ID}}\"}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/addons",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Add-On as Admin (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Updates add-on dailyRate and recalculates availableStock via pre-save hook', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.dailyRate).to.eql(30000);",
+                  "    pm.expect(jsonData.data.availableStock).to.eql(12);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"dailyRate\":30000,\"inventoryStock\":12}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/addons/{{CREATED_ADDON_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{CREATED_ADDON_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Add-On as Admin (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Deletes add-on cleanly', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/addons/{{CREATED_ADDON_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{CREATED_ADDON_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Deleted Add-On (404 Not Found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404 Not Found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Standard failure envelope { success: false, message }', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/addons/{{CREATED_ADDON_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{CREATED_ADDON_ID}}"
+              ]
+            }
+          }
         }
       ]
     },
@@ -1989,6 +2289,55 @@
               ]
             }
           }
+        },
+        {
+          "name": "Get Bookings for Specific Car (Nested Route 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Returns bookings scoped to CREATED_CAR_ID', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const carId = pm.environment.get(\"CREATED_CAR_ID\");",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    pm.expect(jsonData.data.length).to.be.at.least(1);",
+                  "    jsonData.data.forEach((b) => {",
+                  "        const actualCarId = typeof b.car === \"object\" && b.car !== null ? b.car._id : b.car;",
+                  "        pm.expect(actualCarId).to.eql(carId);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/cars/{{CREATED_CAR_ID}}/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cars",
+                "{{CREATED_CAR_ID}}",
+                "bookings"
+              ]
+            }
+          }
         }
       ]
     },
@@ -2032,6 +2381,70 @@
                 "v1",
                 "bookings",
                 "{{BOOKING_SAME_DAY_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Booking via Nested Car Route (POST /cars/:carId/bookings - 201 Created)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date();",
+                  "d.setDate(d.getDate() + 18);",
+                  "pm.environment.set('NESTED_START', d.toISOString().split('T')[0]);",
+                  "d.setDate(d.getDate() + 1);",
+                  "pm.environment.set('NESTED_END', d.toISOString().split('T')[0]);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Creates booking from route :carId without car in JSON body', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.car).to.eql(pm.environment.get('CREATED_CAR_ID'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{NEW_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"startDate\":\"{{NESTED_START}}\",\"endDate\":\"{{NESTED_END}}\",\"numOfCars\":1}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/cars/{{CREATED_CAR_ID}}/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cars",
+                "{{CREATED_CAR_ID}}",
+                "bookings"
               ]
             }
           }

@@ -87,6 +87,9 @@ const isActiveStatus = (status) => {
  * @returns {boolean}
  */
 const isValidStatusTransition = (currentStatus, targetStatus) => {
+  if (isTerminalStatus(currentStatus)) {
+    return false;
+  }
   if (currentStatus === targetStatus) {
     return true;
   }
@@ -115,15 +118,15 @@ const validateStatusTransition = (currentStatus, targetStatus) => {
     };
   }
 
-  if (currentStatus === targetStatus) {
-    return { isValid: true };
-  }
-
   if (isTerminalStatus(currentStatus)) {
     return {
       isValid: false,
       error: `Cannot modify booking with terminal status of '${currentStatus}'`,
     };
+  }
+
+  if (currentStatus === targetStatus) {
+    return { isValid: true };
   }
 
   if (!isValidStatusTransition(currentStatus, targetStatus)) {
