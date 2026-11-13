@@ -7,6 +7,11 @@ const { calculateDurationDays } = require('../utils/date');
 const { calculateBaselinePrice } = require('../utils/pricingCalculator');
 const { calculateActiveCars, isQuotaExceeded } = require('../utils/quota');
 const { releaseBookingAddOns } = require('../utils/bookingInventory');
+const {
+  isTerminalStatus,
+  isActiveStatus,
+  validateStatusTransition,
+} = require('../utils/bookingStateMachine');
 
 /**
  * Checks if a vehicle has an overlapping active reservation (AGENTS.md Invariant 5).
@@ -366,6 +371,15 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
+    // Terminal state guard: cannot modify booking if it is already in a terminal state (Issue #22)
+    if (isTerminalStatus(booking.status)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot modify booking with terminal status of '${booking.status}'`,
+      });
+    }
+
     // 1. Critical Security: Never allow clients to inject totalPrice directly
     delete req.body.totalPrice;
 
@@ -382,10 +396,29 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
-    // 4. Prevent regular user from changing ownership or status
+    // 4. Role-based restrictions & Status Transition Validation (State Machine - Issue #22)
     if (req.user.role !== 'admin') {
       delete req.body.user;
-      delete req.body.status;
+
+      // Regular user cannot change status to anything other than 'Cancelled'
+      if (req.body.status !== undefined && req.body.status !== 'Cancelled') {
+        await session.abortTransaction();
+        return res.status(403).json({
+          success: false,
+          message: 'Only admins can update booking status to values other than Cancelled',
+        });
+      }
+    }
+
+    if (req.body.status !== undefined) {
+      const transition = validateStatusTransition(booking.status, req.body.status);
+      if (!transition.isValid) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: transition.error,
+        });
+      }
     }
 
     // 4. Validate numOfCars format and enforce 3-car quota using quota helper
@@ -465,10 +498,11 @@ exports.updateBooking = async (req, res, next) => {
       }
     }
 
-    // 6. Handle booking cancellation: release allocated add-on stock
+    // 6. Handle booking terminal states: release allocated add-on stock and quota (Issue #22)
     if (
-      req.body.status === 'Cancelled' &&
-      ['Pending', 'Confirmed', 'Active'].includes(booking.status)
+      req.body.status !== undefined &&
+      isTerminalStatus(req.body.status) &&
+      isActiveStatus(booking.status)
     ) {
       await releaseBookingAddOns(booking, session);
     }

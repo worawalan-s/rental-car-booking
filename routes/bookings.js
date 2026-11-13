@@ -31,5 +31,9 @@ router
   )
   .delete(protect, authorize('admin', 'user'), deleteBooking);
 
+router
+  .route('/:id/status')
+  .put(protect, authorize('admin', 'user'), updateBooking);
+
 module.exports = router;
 
