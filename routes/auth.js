@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.post('/register', sanitizeAuthBody, register);
 router.post('/login', sanitizeAuthBody, login);
-router.post('/logout', logout);
+router.route('/logout').get(logout).post(logout);
 router.get('/me', protect, getMe);
 
 module.exports = router;

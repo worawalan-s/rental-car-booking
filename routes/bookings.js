@@ -11,14 +11,22 @@ const { protect, authorize } = require('../middleware/auth');
 const {
   validateBookingPayload,
   validateBookingUpdateDates,
+  validateNestedCarId,
 } = require('../middleware/validate');
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
+
+router.use(validateNestedCarId);
 
 router
   .route('/')
   .get(protect, authorize('admin', 'user'), getBookings)
-  .post(protect, authorize('user'), validateBookingPayload, createBooking);
+  .post(
+    protect,
+    authorize('user'),
+    validateBookingPayload,
+    createBooking
+  );
 
 router
   .route('/:id')

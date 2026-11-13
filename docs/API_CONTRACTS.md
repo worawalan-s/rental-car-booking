@@ -199,7 +199,7 @@ erDiagram
 | `POST` | `/api/v1/auth/register` | Public | Register new user (`name`, `tel`, `email`, `password`). Server enforces `role: 'user'` to prevent privilege escalation. |
 | `POST` | `/api/v1/auth/login` | Public | Login with `email` and `password`, returns JWT token and cookie |
 | `GET` | `/api/v1/auth/me` | Private | Get profile of logged-in user |
-| `POST` | `/api/v1/auth/logout` | Public | Clears authentication cookie |
+| `POST` / `GET` | `/api/v1/auth/logout` | Public | Clears authentication cookie (`GET` supports Assignment 12 convention; `POST` preserves existing clients) |
 
 ### 3.2 Cars Resource (`/api/v1/cars`)
 | Method | Endpoint | Access | Description |
@@ -211,10 +211,15 @@ erDiagram
 | `PUT` | `/api/v1/cars/:id` | Private (Admin) | Update car attributes with schema validators |
 | `DELETE` | `/api/v1/cars/:id` | Private (Admin) | Delete car with **cascading delete** of associated bookings |
 
-### 3.3 Bookings Resource (`/api/v1/bookings`)
+### 3.3 Bookings Resource (`/api/v1/bookings` & `/api/v1/cars/:carId/bookings`)
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/bookings` | Private (User) | Create vehicle reservation with **atomic add-on pessimistic reservation & ACID transaction rollback guarantee** (Adv Req 4). Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$ (exceeding returns HTTP 400). Admins cannot create bookings (`authorize('user')` returns HTTP 403 Forbidden). Atomically locks requested physical add-ons within a `mongoose.startSession()` ACID transaction using `findOneAndUpdate({ _id, isAvailable: true, availableStock: { $gte: qty } }, { $inc: { allocatedStock: qty, availableStock: -qty } })`. If any accessory stock is insufficient or belongs to a different provider branch, the transaction aborts and returns HTTP 400 (`Insufficient inventory stock for add-on: <id>`). Enforces schedule collision checks, validates car existence and availability, auto-assigns `provider = car.provider`, enforces explicit initial status (`'Pending'`), and calculates baseline `totalPrice` in integer Satang. Releasing or cancelling active reservations safely restores allocated physical inventory. Failures return strict two-key error responses. |
+| `GET` | `/api/v1/bookings` | Private (User & Admin) | List bookings (users see own bookings; admins see all; supports `?status=`) |
+| `GET` | `/api/v1/cars/:carId/bookings` | Private (User & Admin) | List bookings scoped to a specific vehicle (Assignment 12 nested routing) |
+| `POST` | `/api/v1/bookings` & `/api/v1/cars/:carId/bookings` | Private (User) | Create vehicle reservation with **atomic add-on pessimistic reservation & ACID transaction rollback guarantee** (Adv Req 4). Enforces hard cumulative **3-car quota** across active bookings (`Pending`, `Confirmed`, `Active`) for users: $\sum(\text{active.numOfCars}) + \text{requestedCars} \le 3$ (exceeding returns HTTP 400). Admins cannot create bookings (`authorize('user')` returns HTTP 403 Forbidden). Atomically locks requested physical add-ons within a `mongoose.startSession()` ACID transaction using `findOneAndUpdate({ _id, isAvailable: true, availableStock: { $gte: qty } }, { $inc: { allocatedStock: qty, availableStock: -qty } })`. If any accessory stock is insufficient or belongs to a different provider branch, the transaction aborts and returns HTTP 400 (`Insufficient inventory stock for add-on: <id>`). Enforces schedule collision checks, validates car existence and availability, auto-assigns `provider = car.provider`, enforces explicit initial status (`'Pending'`), and calculates baseline `totalPrice` in integer Satang. Releasing or cancelling active reservations safely restores allocated physical inventory. Failures return strict two-key error responses. |
+| `GET` | `/api/v1/bookings/:id` | Private (User & Admin) | Get single booking document with populated `car`, `provider`, and `addOns` details. Users can only view own bookings; admins can view any. |
+| `PUT` | `/api/v1/bookings/:id` | Private (User & Admin) | Update booking dates or `numOfCars` (subject to 3-car quota; admins exempt when managing bookings per AGENTS.md §2.4). Cancelling (`status: 'Cancelled'`) releases locked physical add-ons. Disallows changing `car` or `provider` in-place. |
+| `DELETE` | `/api/v1/bookings/:id` | Private (User & Admin) | Hard delete booking document and safely release allocated physical add-on stock within an ACID transaction. |
 
 ### 3.4 Pricing Resource (`/api/v1/pricing`)
 | Method | Endpoint | Access | Description |

@@ -8,9 +8,12 @@ const {
   searchCars,
 } = require('../controllers/cars');
 
+const bookingRouter = require('./bookings');
 const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
+
+router.use('/:carId/bookings', bookingRouter);
 
 router
   .route('/')
