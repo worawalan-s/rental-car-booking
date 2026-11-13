@@ -16,6 +16,11 @@ const ProviderSchema = new mongoose.Schema(
     tel: {
       type: String,
       required: [true, 'Please add a telephone number'],
+      trim: true,
+      match: [
+        /^0[0-9]{9}$/,
+        'Please add a valid 10-digit Thai phone number (0xxxxxxxxx)',
+      ],
     },
     createdAt: {
       type: Date,
