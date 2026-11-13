@@ -4,11 +4,15 @@ const AddOn = require('../models/AddOn');
 const Car = require('../models/Car');
 const Booking = require('../models/Booking');
 const { protect } = require('../middleware/auth');
-const { validateBookingPayload } = require('../middleware/validate');
+const {
+  validateBookingPayload,
+  validateNestedCarId,
+} = require('../middleware/validate');
 const { getCar } = require('../controllers/cars');
 const {
   getBookings,
   getBooking,
+  createBooking,
   updateBooking,
 } = require('../controllers/bookings');
 const authRouter = require('../routes/auth');
@@ -32,11 +36,11 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
     jest.restoreAllMocks();
   });
 
-  describe('AddOn Mongoose 9 pre-save hook', () => {
-    // Trigger registered schema pre-save hook directly since unit tests run without a live MongoDB connection.
-    const runAddOnPreSave = (doc) => AddOn.schema.s.hooks.execPre('save', doc, [{}]);
+  describe('AddOn Mongoose 9 Lifecycle Hooks', () => {
+    // Tests schema pre-save hook behavior without requiring a live MongoDB connection
+    const triggerAddOnPreSave = (doc) => AddOn.schema.s.hooks.execPre('save', doc, [{}]);
 
-    it('auto-computes availableStock without calling deprecated next callback', async () => {
+    it('auto-computes availableStock as (inventoryStock - allocatedStock)', async () => {
       const doc = new AddOn({
         name: 'Child Seat',
         category: 'Child Safety',
@@ -46,12 +50,12 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
         provider: new mongoose.Types.ObjectId(),
       });
 
-      await runAddOnPreSave(doc);
+      await triggerAddOnPreSave(doc);
 
       expect(doc.availableStock).toBe(5);
     });
 
-    it('throws ValidationError when inventoryStock is below allocatedStock', async () => {
+    it('throws ValidationError when inventoryStock is less than allocatedStock', async () => {
       const doc = new AddOn({
         name: 'WiFi Hotspot',
         category: 'Connectivity',
@@ -61,15 +65,15 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
         provider: new mongoose.Types.ObjectId(),
       });
 
-      await expect(runAddOnPreSave(doc)).rejects.toThrow(
+      await expect(triggerAddOnPreSave(doc)).rejects.toThrow(
         mongoose.Error.ValidationError
       );
     });
   });
 
-  describe('Auth protect guard & dual-method /logout', () => {
+  describe('Auth Guard & Dual-Method /logout (Assignment 12)', () => {
     it.each(['none', 'null'])(
-      'rejects literal "%s" bearer token with 401',
+      'rejects literal "%s" bearer token with 401 Unauthorized',
       async (tokenValue) => {
         const req = {
           headers: { authorization: `Bearer ${tokenValue}` },
@@ -100,7 +104,7 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
     });
   });
 
-  describe('Nested /:carId/bookings routing, validation, and scoping', () => {
+  describe('Nested /:carId/bookings Validation & Routing', () => {
     it('mounts /:carId/bookings on carsRouter with mergeParams enabled', () => {
       const carId = '64a123456789abcdef012345';
       const mountedLayer = carsRouter.stack.find(
@@ -112,7 +116,32 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
       expect(bookingsRouter.mergeParams).toBe(true);
     });
 
-    it('accepts req.params.carId in validateBookingPayload and populates req.body.car', () => {
+    it('passes validateNestedCarId when :carId is a valid ObjectId', () => {
+      const req = { params: { carId: new mongoose.Types.ObjectId().toString() } };
+      const res = createMockRes();
+      const next = jest.fn();
+
+      validateNestedCarId(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+    });
+
+    it('rejects invalid :carId with 400 Bad Request in validateNestedCarId middleware', () => {
+      const req = { params: { carId: 'invalid-object-id' } };
+      const res = createMockRes();
+      const next = jest.fn();
+
+      validateNestedCarId(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Resource not found with id of invalid-object-id',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('populates req.body.car from req.params.carId in validateBookingPayload', () => {
       const carId = new mongoose.Types.ObjectId().toString();
       const today = new Date().toISOString().split('T')[0];
       const req = {
@@ -126,24 +155,6 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
 
       expect(next).toHaveBeenCalled();
       expect(req.body.car).toBe(carId);
-    });
-
-    it('rejects invalid req.params.carId in validateBookingPayload with 400', () => {
-      const req = {
-        params: { carId: 'invalid-car-id' },
-        body: { startDate: '2030-01-01', endDate: '2030-01-01', numOfCars: 1 },
-      };
-      const res = createMockRes();
-      const next = jest.fn();
-
-      validateBookingPayload(req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Please provide a valid car ID',
-      });
-      expect(next).not.toHaveBeenCalled();
     });
 
     it('scopes Booking.find filter by req.params.carId in getBookings', async () => {
@@ -172,57 +183,38 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
       });
     });
 
-    it('returns 400 in getBookings when nested req.params.carId is invalid', async () => {
-      const req = {
-        params: { carId: 'not-an-objectid' },
-        query: {},
-        user: { id: 'admin1', role: 'admin' },
-      };
-      const res = createMockRes();
+    it('interpolates targetCarId in 404 message when car not found in createBooking', async () => {
+      const targetCarId = new mongoose.Types.ObjectId().toString();
+      const mockSession = createMockSession();
 
-      await getBookings(req, res, jest.fn());
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Resource not found with id of not-an-objectid',
+      jest.spyOn(mongoose, 'startSession').mockResolvedValue(mockSession);
+      jest.spyOn(Car, 'findById').mockReturnValue({
+        session: jest.fn().mockResolvedValue(null),
       });
-    });
-
-    it('returns 404 in getBooking when nested req.params.carId does not match booking.car', async () => {
-      const requestedCarId = new mongoose.Types.ObjectId().toString();
-      const actualCarId = new mongoose.Types.ObjectId().toString();
-      const bookingId = new mongoose.Types.ObjectId().toString();
-
-      const mockBooking = {
-        _id: bookingId,
-        car: { _id: actualCarId },
-        user: { toString: () => 'admin1' },
-      };
-      const chain = {
-        populate: jest
-          .fn()
-          .mockReturnValueOnce({
-            populate: jest.fn().mockReturnValueOnce({
-              populate: jest.fn().mockResolvedValueOnce(mockBooking),
-            }),
-          }),
-      };
-      jest.spyOn(Booking, 'findById').mockReturnValue(chain);
 
       const req = {
-        params: { id: bookingId, carId: requestedCarId },
-        user: { id: 'admin1', role: 'admin' },
+        params: { carId: targetCarId },
+        body: {
+          startDate: '2030-01-01',
+          endDate: '2030-01-02',
+          numOfCars: 1,
+        },
+        user: { id: 'user1', role: 'user' },
       };
       const res = createMockRes();
 
-      await getBooking(req, res, jest.fn());
+      await createBooking(req, res, jest.fn());
 
       expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: `No car found with the id of ${targetCarId}`,
+      });
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
     });
   });
 
-  describe('Booking update Mongoose 9 options & admin quota exemption', () => {
+  describe('Booking Updates: Mongoose 9 Options & Admin Quota Exemption', () => {
     it('uses returnDocument: "after" instead of deprecated new: true in updateBooking', async () => {
       const bookingId = new mongoose.Types.ObjectId().toString();
       const existingBooking = {
@@ -306,8 +298,8 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
     });
   });
 
-  describe('Cars error masking (Two-key error envelope)', () => {
-    it('masks Mongoose CastError with clean resource message and 400 status', async () => {
+  describe('CastError Masking (Two-Key Error Envelope)', () => {
+    it('masks Mongoose CastError with 400 Bad Request in getCar', async () => {
       const castError = new Error('Cast to ObjectId failed');
       castError.name = 'CastError';
       castError.value = 'invalid-car-id';
@@ -330,7 +322,35 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
       });
     });
 
-    it('masks unexpected database errors with static 500 message instead of leaking err.message', async () => {
+    it('masks Mongoose CastError with 400 Bad Request in getBooking', async () => {
+      const castError = new Error('Cast to ObjectId failed');
+      castError.name = 'CastError';
+      castError.value = 'invalid-booking-id';
+
+      jest.spyOn(Booking, 'findById').mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockRejectedValueOnce(castError),
+          }),
+        }),
+      });
+
+      const req = {
+        params: { id: 'invalid-booking-id' },
+        user: { id: 'user1', role: 'user' },
+      };
+      const res = createMockRes();
+
+      await getBooking(req, res, jest.fn());
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Resource not found with id of invalid-booking-id',
+      });
+    });
+
+    it('masks unexpected database errors with static 500 message in getCar', async () => {
       jest.spyOn(Car, 'findById').mockReturnValue({
         populate: jest.fn().mockReturnValue({
           populate: jest
