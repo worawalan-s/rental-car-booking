@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { uploadFile } = require('../utils/storage');
 
 // Get token from model, create cookie and send response
 const sendTokenResponse = (user, statusCode, res) => {
@@ -156,3 +157,51 @@ exports.getMe = async (req, res, next) => {
     data: req.user,
   });
 };
+
+//@desc     Upload driver license image
+//@route    PUT /api/v1/auth/driver-license
+//@access   Private
+exports.uploadDriverLicense = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload a driver license image file',
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Upload to S3 or local fallback
+    const uploadResult = await uploadFile(req.file, 'licenses');
+
+    user.driverLicense = user.driverLicense || {};
+    user.driverLicense.imageUrl = uploadResult.url;
+    user.driverLicense.uploadedAt = new Date();
+    user.driverLicense.verificationStatus = 'Pending';
+    user.driverLicense.verified = false;
+
+    if (req.body && req.body.idNumber && typeof req.body.idNumber === 'string') {
+      user.driverLicense.idNumber = req.body.idNumber.trim();
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      data: user.driverLicense,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+

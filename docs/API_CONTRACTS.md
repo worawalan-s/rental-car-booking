@@ -102,7 +102,7 @@ erDiagram
 | `email` | `String` | Required, Unique, Email Regex | Unique user credential |
 | `role` | `String` | Enum: `['user', 'admin']` | Default: `'user'` |
 | `password` | `String` | Required, Min 6 chars, `select: false` | Bcrypt hashed with salt 10 |
-| `driverLicense` | `Object` | Optional | Reserved for License Upload feature (`idNumber`, `imageUrl`, `verified`) |
+| `driverLicense` | `Object` | Optional | Driver license details: `idNumber` (String), `imageUrl` (String), `verified` (Boolean, default: false), `uploadedAt` (Date), `verificationStatus` (Enum: `['NotUploaded', 'Pending', 'Verified', 'Rejected']`, default: `'NotUploaded'`) |
 | `createdAt` | `Date` | Default: `Date.now` | |
 
 > **Security Note**: `UserSchema.pre('save')` includes `if (!this.isModified('password')) return next();`. This guarantees that updating profile attributes (e.g., driver license image) does NOT re-hash an already hashed password.
@@ -199,6 +199,7 @@ erDiagram
 | `POST` | `/api/v1/auth/register` | Public | Register new user (`name`, `tel`, `email`, `password`). Server enforces `role: 'user'` to prevent privilege escalation. |
 | `POST` | `/api/v1/auth/login` | Public | Login with `email` and `password`, returns JWT token and cookie |
 | `GET` | `/api/v1/auth/me` | Private | Get profile of logged-in user |
+| `PUT` | `/api/v1/auth/driver-license` | Private (User) | Upload driver license image (multipart/form-data field `license`, max 2MB, JPEG/PNG/WebP) and optional `idNumber` to S3 / local fallback, updating user `driverLicense` details and setting `verificationStatus: 'Pending'` |
 | `POST` / `GET` | `/api/v1/auth/logout` | Public | Clears authentication cookie (`GET` supports Assignment 12 convention; `POST` preserves existing clients) |
 
 ### 3.2 Cars Resource (`/api/v1/cars`)
