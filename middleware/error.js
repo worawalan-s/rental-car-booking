@@ -49,10 +49,16 @@ const errorHandler = (err, req, res, next) => {
     error = new ErrorResponse(message, 401);
   }
 
-  // Standardized response envelope (never leak raw stack traces)
-  res.status(error.statusCode || 500).json({
+  const statusCode = error.statusCode || err.status || 500;
+  const isSafeClientError =
+    err instanceof ErrorResponse ||
+    error instanceof ErrorResponse ||
+    (statusCode >= 400 && statusCode < 500);
+
+  // Standardized response envelope (never leak raw stack traces or internal errors)
+  res.status(statusCode).json({
     success: false,
-    message: error.message || 'Server Error',
+    message: isSafeClientError ? error.message || 'Bad Request' : 'Server Error',
   });
 };
 

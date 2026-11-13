@@ -20,37 +20,34 @@ const consoleLogFormat = winston.format.combine(
   })
 );
 
-// Daily rotate transport for error logs (only logs level 'error')
-const errorRotateTransport = new winston.transports.DailyRotateFile({
-  filename: path.join(logDirectory, 'error-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  level: 'error',
-  maxSize: '20m',
-  maxFiles: '14d',
-  format: fileLogFormat,
-});
+// Helper to create DailyRotateFile transport
+const createRotateTransport = (filename, level) =>
+  new winston.transports.DailyRotateFile({
+    filename: path.join(logDirectory, filename),
+    datePattern: 'YYYY-MM-DD',
+    level,
+    maxSize: '20m',
+    maxFiles: '14d',
+    format: fileLogFormat,
+  });
 
-// Daily rotate transport for all operational logs (info, warn, error)
-const combinedRotateTransport = new winston.transports.DailyRotateFile({
-  filename: path.join(logDirectory, 'combined-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  level: 'info',
-  maxSize: '20m',
-  maxFiles: '14d',
-  format: fileLogFormat,
-});
+const transports = [];
+if (process.env.NODE_ENV !== 'test') {
+  transports.push(
+    createRotateTransport('error-%DATE%.log', 'error'),
+    createRotateTransport('combined-%DATE%.log', 'info')
+  );
+}
 
 // Create Winston logger instance
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
-  transports: [
-    errorRotateTransport,
-    combinedRotateTransport,
-  ],
+  transports,
+  silent: process.env.NODE_ENV === 'test',
 });
 
 // If not in production or test, also log formatted output to console
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
   logger.add(
     new winston.transports.Console({
       format: consoleLogFormat,

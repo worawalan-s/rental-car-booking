@@ -34,18 +34,17 @@ app.use(cookieParser());
 // Query parser
 app.set('query parser', 'extended');
 
-// Dev HTTP request logging in console
+// HTTP request logging (dev console in development, structured file stream otherwise; silent in test)
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
+} else if (process.env.NODE_ENV !== 'test') {
+  app.use(
+    morgan('combined', {
+      stream: logger.stream,
+      skip: (req) => req.url === '/api/v1/health',
+    })
+  );
 }
-
-// Stream HTTP requests to Winston structured log file
-app.use(
-  morgan('combined', {
-    stream: logger.stream,
-    skip: (req) => req.url === '/api/v1/health',
-  })
-);
 
 // Route files
 const auth = require('./routes/auth');
