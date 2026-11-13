@@ -21,6 +21,19 @@ const formatProviderError = (err, req) => {
   return "An unexpected error occurred";
 };
 
+// Helper to handle and dispatch standardized error responses
+const handleProviderError = (err, req, res) => {
+  const isClientError =
+    err.name === "CastError" ||
+    err.code === 11000 ||
+    err.name === "ValidationError";
+  const statusCode = isClientError ? 400 : 500;
+  return res.status(statusCode).json({
+    success: false,
+    message: formatProviderError(err, req),
+  });
+};
+
 // @desc     Get all providers
 // @route    GET /api/v1/providers
 // @access   Public
@@ -52,11 +65,11 @@ exports.getProviders = async (req, res, next) => {
       }
     }
 
-    // Create query string
+    // Create query string: safely map comparison operators on object keys
     let queryStr = JSON.stringify(reqQuery);
     queryStr = queryStr.replace(
-      /\b(gt|gte|lt|lte|in)\b/g,
-      (match) => `$${match}`,
+      /"(gt|gte|lt|lte|in)":/g,
+      (match, op) => `"$${op}":`,
     );
 
     const parsedQuery = JSON.parse(queryStr);
@@ -119,10 +132,7 @@ exports.getProviders = async (req, res, next) => {
 
     res.status(200).json(responsePayload);
   } catch (err) {
-    res.status(400).json({
-      success: false,
-      message: formatProviderError(err, req),
-    });
+    return handleProviderError(err, req, res);
   }
 };
 
@@ -151,10 +161,7 @@ exports.getProvider = async (req, res, next) => {
 
     res.status(200).json(responsePayload);
   } catch (err) {
-    res.status(400).json({
-      success: false,
-      message: formatProviderError(err, req),
-    });
+    return handleProviderError(err, req, res);
   }
 };
 
@@ -170,10 +177,7 @@ exports.createProvider = async (req, res, next) => {
 
     res.status(201).json({ success: true, data: provider });
   } catch (err) {
-    res.status(400).json({
-      success: false,
-      message: formatProviderError(err, req),
-    });
+    return handleProviderError(err, req, res);
   }
 };
 
@@ -199,10 +203,7 @@ exports.updateProvider = async (req, res, next) => {
 
     res.status(200).json({ success: true, data: provider });
   } catch (err) {
-    res.status(400).json({
-      success: false,
-      message: formatProviderError(err, req),
-    });
+    return handleProviderError(err, req, res);
   }
 };
 
@@ -217,7 +218,9 @@ exports.deleteProvider = async (req, res, next) => {
     const provider = await Provider.findById(req.params.id).session(session);
 
     if (!provider) {
-      await session.abortTransaction();
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
       return res.status(404).json({
         success: false,
         message: `Provider not found with id of ${req.params.id}`,
@@ -237,11 +240,10 @@ exports.deleteProvider = async (req, res, next) => {
 
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
-    await session.abortTransaction();
-    res.status(400).json({
-      success: false,
-      message: formatProviderError(err, req),
-    });
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+    return handleProviderError(err, req, res);
   } finally {
     session.endSession();
   }
