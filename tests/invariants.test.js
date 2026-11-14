@@ -339,8 +339,7 @@ describe('Domain Invariants Unit Tests (AGENTS.md & API_CONTRACTS.md)', () => {
     });
 
     it('should allow booking starting today (same day rental or future)', () => {
-      const today = new Date();
-      const todayISO = today.toISOString().split('T')[0];
+      const todayISO = new Date().toLocaleDateString('en-CA');
 
       mockReq = {
         body: {
@@ -356,14 +355,15 @@ describe('Domain Invariants Unit Tests (AGENTS.md & API_CONTRACTS.md)', () => {
     });
 
     it('should reject bookings when duration exceeds 30 days', () => {
-      const today = new Date();
+      const todayISO = new Date().toLocaleDateString('en-CA');
       const returnDate = new Date();
-      returnDate.setDate(today.getDate() + 35); // 35 days
+      returnDate.setDate(returnDate.getDate() + 35); // 35 days
+      const returnDateISO = returnDate.toLocaleDateString('en-CA');
 
       mockReq = {
         body: {
-          startDate: today.toISOString().split('T')[0],
-          endDate: returnDate.toISOString().split('T')[0],
+          startDate: todayISO,
+          endDate: returnDateISO,
         },
       };
 

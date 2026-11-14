@@ -63,6 +63,12 @@
       "enabled": true
     },
     {
+      "key": "CREATED_PROVIDER_ID",
+      "value": "6af707f42d27ec7e3542ed20",
+      "type": "default",
+      "enabled": true
+    },
+    {
       "key": "ADDON_ID",
       "value": "",
       "type": "default",
