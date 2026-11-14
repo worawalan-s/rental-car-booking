@@ -77,7 +77,8 @@ async function main() {
   const reportPath = path.join(__dirname, '..', 'postman', 'newman-report.json');
 
   console.log('\n[INFO] Running Newman against Postman Collection...');
-  const newmanCmd = `npx newman run "${collectionPath}" -e "${environmentPath}" --reporters cli,json --reporter-json-export "${reportPath}"`;
+  const repoRoot = path.join(__dirname, '..');
+  const newmanCmd = `npx newman run "${collectionPath}" -e "${environmentPath}" --working-dir "${repoRoot}" --reporters cli,json --reporter-json-export "${reportPath}"`;
 
   let exitCode = 0;
   try {

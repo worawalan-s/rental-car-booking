@@ -62,7 +62,10 @@ const addons = require('./routes/addons');
 app.get('/api/v1/health', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Rental Car Booking API is running',
+    data: {
+      status: 'healthy',
+      service: 'Rental Car Booking API',
+    },
   });
 });
 
