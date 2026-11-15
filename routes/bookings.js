@@ -5,6 +5,8 @@ const {
   getBookings,
   updateBooking,
   deleteBooking,
+  handlePaymentWebhook,
+  progressBookingsByTimeline,
 } = require('../controllers/bookings');
 
 const { protect, authorize } = require('../middleware/auth');
@@ -27,6 +29,14 @@ router
     validateBookingPayload,
     createBooking
   );
+
+router.post('/webhook', handlePaymentWebhook);
+router.post(
+  '/progress-timeline',
+  protect,
+  authorize('admin'),
+  progressBookingsByTimeline
+);
 
 router
   .route('/:id')
