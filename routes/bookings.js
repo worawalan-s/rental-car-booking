@@ -5,6 +5,8 @@ const {
   getBookings,
   updateBooking,
   deleteBooking,
+  handlePaymentWebhook,
+  progressBookingsByTimeline,
 } = require('../controllers/bookings');
 
 const { protect, authorize } = require('../middleware/auth');
@@ -22,7 +24,7 @@ router.use(validateNestedCarId);
  * @swagger
  * tags:
  *   name: Bookings
- *   description: Vehicle reservation management, 3-car quota enforcement, and booking lifecycles
+ *   description: Vehicle reservation management, 3-car quota enforcement, payment webhooks, and state machine lifecycle
  */
 
 /**
@@ -61,6 +63,10 @@ router.use(validateNestedCarId);
  *           type: string
  *           enum: [Pending, Confirmed, Active, Completed, Cancelled]
  *           example: Pending
+ *         paymentStatus:
+ *           type: string
+ *           enum: [Unpaid, Paid, Failed, Refunded]
+ *           example: Unpaid
  *         totalPrice:
  *           type: integer
  *           description: Total price in Satang (100 Satang = 1.00 THB)
@@ -168,6 +174,79 @@ router
 
 /**
  * @swagger
+ * /bookings/webhook:
+ *   post:
+ *     summary: Payment gateway webhook handler with idempotent database updates & <50ms RabbitMQ event emission
+ *     tags: [Bookings]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - eventId
+ *               - eventType
+ *               - bookingId
+ *             properties:
+ *               eventId:
+ *                 type: string
+ *                 example: evt_pay_demo_001
+ *               eventType:
+ *                 type: string
+ *                 enum: [payment.succeeded, payment.failed]
+ *                 example: payment.succeeded
+ *               bookingId:
+ *                 type: string
+ *                 example: 60d5ec49f1b2c8b1f8e4e1a1
+ *     responses:
+ *       200:
+ *         description: Webhook processed (or replayed idempotently) and domain event published within 50ms
+ *       400:
+ *         description: Invalid payload or illegal state transition
+ *       404:
+ *         description: Booking not found
+ */
+router.post('/webhook', handlePaymentWebhook);
+
+/**
+ * @swagger
+ * /bookings/progress-timeline:
+ *   post:
+ *     summary: Trigger automatic rental timeline status progression (Confirmed -> Active -> Completed) (Admin only)
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               referenceDate:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2026-12-10T10:00:00.000Z"
+ *     responses:
+ *       200:
+ *         description: Timeline progression evaluated and domain events published
+ *       400:
+ *         description: Invalid referenceDate format
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Forbidden - Admin only
+ */
+router.post(
+  '/progress-timeline',
+  protect,
+  authorize('admin'),
+  progressBookingsByTimeline
+);
+
+/**
+ * @swagger
  * /bookings/{id}:
  *   get:
  *     summary: Get single booking by ID
@@ -189,7 +268,7 @@ router
  *       404:
  *         description: Booking not found
  *   put:
- *     summary: Update booking dates, cars count, or status
+ *     summary: Update booking dates, cars count, or status (Governed by deterministic State Machine)
  *     tags: [Bookings]
  *     security:
  *       - bearerAuth: []
@@ -224,9 +303,11 @@ router
  *       200:
  *         description: Booking updated successfully
  *       400:
- *         description: Validation error or schedule collision
+ *         description: State machine violation, terminal state modification, or schedule collision
  *       401:
  *         description: Not authorized
+ *       403:
+ *         description: Forbidden status update for regular user
  *       404:
  *         description: Booking not found
  *   delete:

@@ -57,6 +57,7 @@ const bookings = require('./routes/bookings');
 const pricing = require('./routes/pricing');
 const provider = require('./routes/provider');
 const addons = require('./routes/addons');
+const payments = require('./routes/payments');
 
 // Swagger API Documentation (Task 17 / Issue #24 - Course Assignment 12 specification)
 const swaggerJsDoc = require('swagger-jsdoc');
@@ -119,6 +120,7 @@ app.get('/api/v1/health', (req, res) => {
 app.use('/api/v1/auth', auth);
 app.use('/api/v1/cars', cars);
 app.use('/api/v1/bookings', bookings);
+app.use('/api/v1/payments', payments);
 app.use('/api/v1/pricing', pricing);
 app.use('/api/v1/providers', provider);
 app.use('/api/v1/addons', addons);
