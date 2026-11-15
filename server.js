@@ -3,6 +3,12 @@ const path = require('path');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
+const mongoSanitize = require('express-mongo-sanitize');
+const helmet = require('helmet');
+const { xss } = require('express-xss-sanitizer');
+const rateLimit = require('express-rate-limit');
+const hpp = require('hpp');
+const cors = require('cors');
 const connectDB = require('./config/db');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/error');
@@ -26,8 +32,47 @@ connectDB();
 
 const app = express();
 
+// Express 5 compatibility: allow express-mongo-sanitize to sanitize req.query
+const queryDescriptor = Object.getOwnPropertyDescriptor(express.request, 'query');
+if (queryDescriptor && !queryDescriptor.set) {
+  Object.defineProperty(express.request, 'query', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return this._sanitizedQuery !== undefined
+        ? this._sanitizedQuery
+        : queryDescriptor.get.call(this);
+    },
+    set(val) {
+      this._sanitizedQuery = val;
+    },
+  });
+}
+
 // Body parser
 app.use(express.json());
+
+// Sanitize data (prevent NoSQL query injection)
+app.use(mongoSanitize());
+
+// Set security headers
+app.use(helmet());
+
+// Prevent XSS attacks
+app.use(xss());
+
+// Rate limiting (windowMs: 10 * 60 * 1000, max: 100)
+const limiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 mins
+  max: 100,
+});
+app.use(limiter);
+
+// Prevent HTTP param pollution
+app.use(hpp());
+
+// Enable CORS
+app.use(cors());
 
 // Cookie parser
 app.use(cookieParser());
