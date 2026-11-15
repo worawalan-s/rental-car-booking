@@ -5,6 +5,7 @@
  *   Pending -> Confirmed -> Active -> Completed (or Cancelled)
  *
  * Terminal states: Completed, Cancelled (cannot transition or regress)
+ * Supports payment gateway webhook event mapping and rental timeline progression.
  */
 
 const BOOKING_STATUS = Object.freeze({
@@ -27,6 +28,22 @@ const ACTIVE_STATUSES = Object.freeze([
   BOOKING_STATUS.CONFIRMED,
   BOOKING_STATUS.ACTIVE,
 ]);
+
+const WEBHOOK_EVENT_TYPES = Object.freeze({
+  PAYMENT_SUCCEEDED: 'payment.succeeded',
+  PAYMENT_FAILED: 'payment.failed',
+});
+
+const WEBHOOK_STATUS_MAP = Object.freeze({
+  [WEBHOOK_EVENT_TYPES.PAYMENT_SUCCEEDED]: Object.freeze({
+    targetStatus: BOOKING_STATUS.CONFIRMED,
+    paymentStatus: 'Paid',
+  }),
+  [WEBHOOK_EVENT_TYPES.PAYMENT_FAILED]: Object.freeze({
+    targetStatus: BOOKING_STATUS.CANCELLED,
+    paymentStatus: 'Failed',
+  }),
+});
 
 /**
  * Transition rules map:
@@ -139,15 +156,86 @@ const validateStatusTransition = (currentStatus, targetStatus) => {
   return { isValid: true };
 };
 
+/**
+ * Resolves a payment gateway webhook eventType into its target booking status and paymentStatus.
+ * @param {string} eventType
+ * @returns {{ isValid: boolean, targetStatus?: string, paymentStatus?: string, error?: string }}
+ */
+const resolveWebhookTargetStatus = (eventType) => {
+  const mapping = WEBHOOK_STATUS_MAP[eventType];
+  if (!mapping) {
+    return {
+      isValid: false,
+      error:
+        "Invalid or unsupported webhook eventType. Allowed values: 'payment.succeeded', 'payment.failed'",
+    };
+  }
+  return {
+    isValid: true,
+    targetStatus: mapping.targetStatus,
+    paymentStatus: mapping.paymentStatus,
+  };
+};
+
+/**
+ * Deterministically evaluates whether a booking should automatically transition
+ * based on rental start/end timelines relative to referenceDate.
+ * - Confirmed -> Active when startDate <= referenceDate
+ * - Active -> Completed when endDate <= referenceDate
+ *
+ * @param {Object} booking - Booking object containing { status, startDate, endDate }
+ * @param {Date|string|number} [referenceDate=new Date()]
+ * @returns {{ shouldTransition: boolean, targetStatus: string|null, reason?: string }}
+ */
+const evaluateTimelineTransition = (booking, referenceDate = new Date()) => {
+  if (!booking || !booking.status || isTerminalStatus(booking.status)) {
+    return { shouldTransition: false, targetStatus: null };
+  }
+
+  const refDate = new Date(referenceDate);
+  const refTime = refDate.getTime();
+  if (Number.isNaN(refTime)) {
+    return { shouldTransition: false, targetStatus: null };
+  }
+
+  if (booking.status === BOOKING_STATUS.CONFIRMED && booking.startDate) {
+    const startTime = new Date(booking.startDate).getTime();
+    if (!Number.isNaN(startTime) && startTime <= refTime) {
+      return {
+        shouldTransition: true,
+        targetStatus: BOOKING_STATUS.ACTIVE,
+        reason: 'Rental startDate reached',
+      };
+    }
+  }
+
+  if (booking.status === BOOKING_STATUS.ACTIVE && booking.endDate) {
+    const endTime = new Date(booking.endDate).getTime();
+    if (!Number.isNaN(endTime) && endTime <= refTime) {
+      return {
+        shouldTransition: true,
+        targetStatus: BOOKING_STATUS.COMPLETED,
+        reason: 'Rental endDate reached',
+      };
+    }
+  }
+
+  return { shouldTransition: false, targetStatus: null };
+};
+
 module.exports = {
   BOOKING_STATUS,
   VALID_STATUSES,
   TERMINAL_STATUSES,
   ACTIVE_STATUSES,
+  WEBHOOK_EVENT_TYPES,
+  WEBHOOK_STATUS_MAP,
   ALLOWED_STATUS_TRANSITIONS,
   isValidStatus,
   isTerminalStatus,
   isActiveStatus,
   isValidStatusTransition,
   validateStatusTransition,
+  resolveWebhookTargetStatus,
+  evaluateTimelineTransition,
 };

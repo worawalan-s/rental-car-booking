@@ -10,7 +10,10 @@ const {
   isTerminalStatus,
   isActiveStatus,
   validateStatusTransition,
+  resolveWebhookTargetStatus,
+  evaluateTimelineTransition,
 } = require('../utils/bookingStateMachine');
+const messageBroker = require('../config/messageBroker');
 
 /**
  * Standardizes Mongoose ValidationError, CastError, and 500 error responses for booking endpoints
@@ -292,6 +295,14 @@ exports.createBooking = async (req, res, next) => {
 
     await safeCommit(session);
 
+    // 10. Publish domain event (booking:pending) to message broker within 50ms SLA
+    await messageBroker.publishBookingEvent({
+      bookingId: booking._id,
+      previousStatus: null,
+      newStatus: booking.status,
+      triggeredBy: 'user',
+    });
+
     res.status(201).json({
       success: true,
       data: booking,
@@ -438,6 +449,26 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
+    // Optional idempotency key check on updateBooking to prevent duplicate concurrent updates
+    const idempotencyKey =
+      (req.headers &&
+        (req.headers['x-idempotency-key'] || req.headers['idempotency-key'])) ||
+      (req.body && req.body.idempotencyKey);
+    delete req.body.idempotencyKey;
+
+    if (
+      idempotencyKey &&
+      Array.isArray(booking.processedWebhookEvents) &&
+      booking.processedWebhookEvents.includes(String(idempotencyKey))
+    ) {
+      await safeCommit(session);
+      return res.status(200).json({
+        success: true,
+        idempotent: true,
+        data: booking,
+      });
+    }
+
     // Terminal state guard: cannot modify booking if it is already in a terminal state (Issue #22)
     if (isTerminalStatus(booking.status)) {
       await safeAbort(session);
@@ -446,6 +477,8 @@ exports.updateBooking = async (req, res, next) => {
         message: `Cannot modify booking with terminal status of '${booking.status}'`,
       });
     }
+
+    const previousStatus = booking.status;
 
     // 1. Critical Security: Never allow clients to inject totalPrice directly
     delete req.body.totalPrice;
@@ -599,17 +632,37 @@ exports.updateBooking = async (req, res, next) => {
       });
     }
 
+    if (req.body.status && req.body.status !== previousStatus) {
+      req.body.lastTransitionAt = new Date();
+    }
+
+    const updatePayload = idempotencyKey
+      ? {
+          ...req.body,
+          $addToSet: { processedWebhookEvents: String(idempotencyKey) },
+        }
+      : req.body;
+
     const updateOptions = session
       ? { returnDocument: 'after', session, runValidators: true }
       : { returnDocument: 'after', runValidators: true };
 
     booking = await Booking.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updatePayload,
       updateOptions
     );
 
     await safeCommit(session);
+
+    if (booking && booking.status && booking.status !== previousStatus) {
+      await messageBroker.publishBookingEvent({
+        bookingId: booking._id || req.params.id,
+        previousStatus,
+        newStatus: booking.status,
+        triggeredBy: req.user ? req.user.role : 'user',
+      });
+    }
 
     res.status(200).json({ success: true, data: booking });
   } catch (err) {
@@ -659,6 +712,291 @@ exports.deleteBooking = async (req, res, next) => {
   } catch (err) {
     await safeAbort(session);
     return handleBookingError(res, err, 'Cannot delete Booking');
+  } finally {
+    safeEnd(session);
+  }
+};
+
+/**
+ * @desc    Handle payment gateway webhook with idempotent database execution & <50ms event publication
+ * @route   POST /api/v1/bookings/webhook | POST /api/v1/payments/webhook
+ * @access  Public (Webhook endpoint with optional signature verification)
+ */
+exports.handlePaymentWebhook = async (req, res, next) => {
+  // Optional webhook signature guard when WEBHOOK_SECRET is configured
+  if (process.env.WEBHOOK_SECRET) {
+    const signature =
+      req.headers && req.headers['x-webhook-signature'];
+    if (signature !== process.env.WEBHOOK_SECRET) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid webhook signature',
+      });
+    }
+  }
+
+  const rawEventId =
+    (req.body && (req.body.eventId || req.body.id)) ||
+    (req.headers &&
+      (req.headers['x-idempotency-key'] || req.headers['idempotency-key']));
+  const eventId =
+    typeof rawEventId === 'string' ? rawEventId.trim() : '';
+
+  if (!eventId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide a valid webhook eventId or X-Idempotency-Key',
+    });
+  }
+
+  const eventType =
+    req.body && (req.body.eventType || req.body.type || req.body.event);
+  const webhookTarget = resolveWebhookTargetStatus(eventType);
+
+  if (!webhookTarget.isValid) {
+    return res.status(400).json({
+      success: false,
+      message: webhookTarget.error,
+    });
+  }
+
+  const bookingId =
+    req.body &&
+    (req.body.bookingId ||
+      (req.body.data && req.body.data.bookingId) ||
+      req.body.booking);
+
+  if (!bookingId || !mongoose.Types.ObjectId.isValid(String(bookingId))) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide a valid bookingId',
+    });
+  }
+
+  const session = await createSafeSession();
+  try {
+    const booking = await Booking.findById(bookingId).session(session);
+    if (!booking) {
+      await safeAbort(session);
+      return res.status(404).json({
+        success: false,
+        message: `No booking found with id of ${bookingId}`,
+      });
+    }
+
+    // 1. Idempotency check: if eventId was already processed, return 200 without duplicate side effects
+    if (
+      Array.isArray(booking.processedWebhookEvents) &&
+      booking.processedWebhookEvents.includes(eventId)
+    ) {
+      await safeCommit(session);
+      return res.status(200).json({
+        success: true,
+        idempotent: true,
+        data: booking,
+      });
+    }
+
+    // 2. Deterministic state machine validation (e.g. Pending -> Confirmed or Pending -> Cancelled)
+    const previousStatus = booking.status;
+    const transition = validateStatusTransition(
+      previousStatus,
+      webhookTarget.targetStatus
+    );
+    if (!transition.isValid) {
+      await safeAbort(session);
+      return res.status(400).json({
+        success: false,
+        message: transition.error,
+      });
+    }
+
+    // 3. If webhook transitions to terminal status (e.g. payment.failed -> Cancelled), release add-ons
+    if (
+      isTerminalStatus(webhookTarget.targetStatus) &&
+      isActiveStatus(previousStatus)
+    ) {
+      await releaseBookingAddOns(booking, session);
+    }
+
+    // 4. Atomic Compare-and-Swap update guarded by current status and eventId absence to prevent race conditions
+    const updateOptions = session
+      ? { returnDocument: 'after', session, runValidators: true }
+      : { returnDocument: 'after', runValidators: true };
+
+    const updatedBooking = await Booking.findOneAndUpdate(
+      {
+        _id: booking._id,
+        status: previousStatus,
+        processedWebhookEvents: { $ne: eventId },
+      },
+      {
+        $set: {
+          status: webhookTarget.targetStatus,
+          paymentStatus: webhookTarget.paymentStatus,
+          lastTransitionAt: new Date(),
+        },
+        $addToSet: {
+          processedWebhookEvents: eventId,
+        },
+      },
+      updateOptions
+    );
+
+    if (!updatedBooking) {
+      await safeAbort(session);
+      const latestBooking = await Booking.findById(bookingId);
+      if (
+        latestBooking &&
+        Array.isArray(latestBooking.processedWebhookEvents) &&
+        latestBooking.processedWebhookEvents.includes(eventId)
+      ) {
+        return res.status(200).json({
+          success: true,
+          idempotent: true,
+          data: latestBooking,
+        });
+      }
+      return res.status(409).json({
+        success: false,
+        message: 'Concurrent booking state update conflict detected',
+      });
+    }
+
+    await safeCommit(session);
+
+    // 5. Publish domain event to Message Broker within 50ms SLA
+    const publishResult = await messageBroker.publishBookingEvent({
+      bookingId: updatedBooking._id,
+      previousStatus,
+      newStatus: updatedBooking.status,
+      triggeredBy: 'payment_webhook',
+      metadata: {
+        webhookEventId: eventId,
+        webhookEventType: eventType,
+        paymentStatus: webhookTarget.paymentStatus,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      idempotent: false,
+      eventPublished: publishResult.event.eventType,
+      publishLatencyMs: publishResult.latencyMs,
+      data: updatedBooking,
+    });
+  } catch (err) {
+    await safeAbort(session);
+    return handleBookingError(res, err, 'Cannot process payment webhook');
+  } finally {
+    safeEnd(session);
+  }
+};
+
+/**
+ * @desc    Automatically progress booking statuses based on rental timelines (Confirmed -> Active, Active -> Completed)
+ * @route   POST /api/v1/bookings/progress-timeline
+ * @access  Private (Admin)
+ */
+exports.progressBookingsByTimeline = async (req, res, next) => {
+  const rawRef =
+    (req.body && req.body.referenceDate) ||
+    (req.query && req.query.referenceDate);
+  const referenceDate = rawRef ? new Date(rawRef) : new Date();
+
+  if (Number.isNaN(referenceDate.getTime())) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid referenceDate format',
+    });
+  }
+
+  const session = await createSafeSession();
+  try {
+    let queryBuilder = Booking.find({
+      status: { $in: ['Confirmed', 'Active'] },
+    });
+    if (queryBuilder && typeof queryBuilder.session === 'function') {
+      queryBuilder = queryBuilder.session(session);
+    }
+
+    const candidates = await queryBuilder;
+    const transitions = [];
+    let activatedCount = 0;
+    let completedCount = 0;
+
+    const updateOptions = session
+      ? { returnDocument: 'after', session, runValidators: true }
+      : { returnDocument: 'after', runValidators: true };
+
+    for (const booking of candidates) {
+      const evalResult = evaluateTimelineTransition(booking, referenceDate);
+      if (!evalResult.shouldTransition || !evalResult.targetStatus) {
+        continue;
+      }
+
+      const previousStatus = booking.status;
+      const targetStatus = evalResult.targetStatus;
+
+      if (isTerminalStatus(targetStatus) && isActiveStatus(previousStatus)) {
+        await releaseBookingAddOns(booking, session);
+      }
+
+      const updated = await Booking.findOneAndUpdate(
+        {
+          _id: booking._id,
+          status: previousStatus,
+        },
+        {
+          $set: {
+            status: targetStatus,
+            lastTransitionAt: new Date(),
+          },
+        },
+        updateOptions
+      );
+
+      if (updated) {
+        if (targetStatus === 'Active') activatedCount += 1;
+        if (targetStatus === 'Completed') completedCount += 1;
+
+        const publishResult = await messageBroker.publishBookingEvent({
+          bookingId: updated._id,
+          previousStatus,
+          newStatus: updated.status,
+          triggeredBy: 'timeline_progression',
+          metadata: {
+            reason: evalResult.reason,
+            referenceDate: referenceDate.toISOString(),
+          },
+        });
+
+        transitions.push({
+          bookingId: updated._id,
+          previousStatus,
+          newStatus: updated.status,
+          reason: evalResult.reason,
+          eventPublished: publishResult.event.eventType,
+          publishLatencyMs: publishResult.latencyMs,
+        });
+      }
+    }
+
+    await safeCommit(session);
+
+    return res.status(200).json({
+      success: true,
+      count: transitions.length,
+      data: {
+        referenceDate: referenceDate.toISOString(),
+        activatedCount,
+        completedCount,
+        transitions,
+      },
+    });
+  } catch (err) {
+    await safeAbort(session);
+    return handleBookingError(res, err, 'Cannot progress booking timelines');
   } finally {
     safeEnd(session);
   }
