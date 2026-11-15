@@ -1,11 +1,54 @@
 {
   "info": {
     "_postman_id": "8c7d6e5a-1b2c-4f3e-9a8b-123456789abc",
-    "name": "Rental Car Booking Platform - Stage 1 & 2 Verification Suite",
-    "description": "Course-aligned comprehensive API verification for Rental Car Booking Platform (Stage 1 & Stage 2). Covers Auth, Cars CRUD, Faceted Search (<200ms), Satang Pricing Engine (<100ms), Invariant 6 Same-Day Rental, 3-Car Quota Enforcement, Invariant 5 Schedule Collision, Add-ons CRUD & Auth Guards, and Invariant 7 Cascade Hard Delete.",
+    "name": "Rental Car Booking Platform - E2E Regression & Grading Suite",
+    "description": "Comprehensive End-to-End Regression & Course Grading Test Suite matching PM.json and Assignment 12 / VacQ specifications.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
+    {
+      "name": "00-Health",
+      "item": [
+        {
+          "name": "Base API Health Check (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Returns success true and data payload per AGENTS.md §1.2', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('object');",
+                  "    pm.expect(jsonData.data.status).to.eql('healthy');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/health",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
     {
       "name": "01-Auth",
       "item": [
@@ -487,11 +530,570 @@
               ]
             }
           }
+        },
+        {
+          "name": "Upload Driver License Missing File (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Rejects upload with missing file', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.include('Please upload a driver license image file');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/driver-license",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "driver-license"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Driver License Unauthorized (401 Unauthorized)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Rejects unauthenticated upload request', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.include('Not authorized');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer null",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/driver-license",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "driver-license"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Driver License (Happy Path - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Returns updated driver license payload with Pending verification status', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('object');",
+                  "    pm.expect(jsonData.data.verificationStatus).to.eql('Pending');",
+                  "    pm.expect(jsonData.data.imageUrl).to.be.a('string').and.not.empty;",
+                  "    pm.expect(jsonData.data.idNumber).to.eql('1103701234567');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "license",
+                  "type": "file",
+                  "src": "postman/fixtures/sample_license.png"
+                },
+                {
+                  "key": "idNumber",
+                  "value": "1103701234567",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/driver-license",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "driver-license"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "02-Cars-and-Search",
+      "name": "02-Providers",
+      "item": [
+        {
+          "name": "Get All Providers (Public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Returns providers array and captures PROVIDER_ID', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array').that.is.not.empty;",
+                  "    const firstProvider = jsonData.data[0];",
+                  "    pm.environment.set('PROVIDER_ID', firstProvider._id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/providers",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Provider by ID (Public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Returns single provider matching PROVIDER_ID', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data._id).to.eql(pm.environment.get('PROVIDER_ID'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/providers/{{PROVIDER_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers",
+                "{{PROVIDER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Provider Invalid ObjectId (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Returns standardized error message format', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.include('Invalid provider ID format');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/providers/invalid_provider_id_123",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers",
+                "invalid_provider_id_123"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Provider as Standard User (Forbidden 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 403 Forbidden', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('Standard user cannot create providers', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Unauthorized Rental Group\",\n  \"address\": \"123 Silom Road, Bang Rak, Bangkok 10500\",\n  \"tel\": \"0812345678\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/providers",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Provider Invalid Phone Format (Invariant 2 - 400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Rejects non-10-digit Thai telephone number', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.match(/tel|phone/i);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid Phone Mobility\",\n  \"address\": \"456 Sukhumvit Road, Khlong Toei, Bangkok 10110\",\n  \"tel\": \"12345\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/providers",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Provider as Admin (201 Created)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Admin creates provider and captures CREATED_PROVIDER_ID', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data._id).to.be.a('string');",
+                  "    pm.environment.set('CREATED_PROVIDER_ID', jsonData.data._id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Apex Mobility Fleet Bangkok\",\n  \"address\": \"789 Phahonyothin Road, Phaya Thai, Bangkok 10400\",\n  \"tel\": \"0298765430\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/providers",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Provider as Admin (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Provider updated successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.name).to.eql('Apex Mobility Prime Fleet Bangkok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Apex Mobility Prime Fleet Bangkok\",\n  \"tel\": \"0298765431\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/providers/{{CREATED_PROVIDER_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers",
+                "{{CREATED_PROVIDER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Provider as Admin (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Provider deleted successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/providers/{{CREATED_PROVIDER_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers",
+                "{{CREATED_PROVIDER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Deleted Provider (404 Not Found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 404 Not Found', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('Returns 404 for deleted provider', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/providers/{{CREATED_PROVIDER_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers",
+                "{{CREATED_PROVIDER_ID}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03-Cars-and-Search",
       "item": [
         {
           "name": "Get All Cars (Public)",
@@ -908,7 +1510,7 @@
       ]
     },
     {
-      "name": "03-Pricing-Engine",
+      "name": "04-Pricing-Engine",
       "item": [
         {
           "name": "Calculate Pricing with Satang Arithmetic (<100ms SLA - Task 5)",
@@ -1095,7 +1697,7 @@
       ]
     },
     {
-      "name": "04-AddOns",
+      "name": "05-AddOns",
       "item": [
         {
           "name": "Get Add-Ons (Public)",
@@ -1598,7 +2200,7 @@
       ]
     },
     {
-      "name": "05-Bookings-and-Quota",
+      "name": "06-Bookings-and-Quota",
       "item": [
         {
           "name": "Create 1st Booking (New User - Valid 201)",
@@ -2342,7 +2944,7 @@
       ]
     },
     {
-      "name": "06-Cleanup-and-Cascade",
+      "name": "07-Cleanup-and-Cascade",
       "item": [
         {
           "name": "Delete Single Booking as User (200 OK)",
