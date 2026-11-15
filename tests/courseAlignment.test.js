@@ -143,7 +143,7 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
 
     it('populates req.body.car from req.params.carId in validateBookingPayload', () => {
       const carId = new mongoose.Types.ObjectId().toString();
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       const req = {
         params: { carId },
         body: { startDate: today, endDate: today, numOfCars: 1 },
@@ -160,7 +160,7 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
     it('rejects conflicting car ID between route param and body in validateBookingPayload with 400', () => {
       const urlCarId = new mongoose.Types.ObjectId().toString();
       const bodyCarId = new mongoose.Types.ObjectId().toString();
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       const req = {
         params: { carId: urlCarId },
         body: { car: bodyCarId, startDate: today, endDate: today, numOfCars: 1 },
