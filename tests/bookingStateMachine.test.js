@@ -408,10 +408,11 @@ describe('Task 15: Booking State Machine & Transition Invariants Suite (#22)', (
 
       expect(statusCode).toBe(200);
       expect(jsonResponse.success).toBe(true);
-      expect(jsonResponse.idempotent).toBe(false);
-      expect(jsonResponse.eventPublished).toBe('booking:confirmed');
-      expect(jsonResponse.publishLatencyMs).toBeLessThanOrEqual(50);
       expect(jsonResponse.data.status).toBe('Confirmed');
+      const publishedEvents = messageBroker.getPublishedEvents();
+      expect(publishedEvents).toHaveLength(1);
+      expect(publishedEvents[0].eventType).toBe('booking:confirmed');
+      expect(publishedEvents[0].latencyMs).toBeLessThanOrEqual(50);
       expect(Booking.findOneAndUpdate).toHaveBeenCalledWith(
         {
           _id: bookingId,
@@ -456,7 +457,7 @@ describe('Task 15: Booking State Machine & Transition Invariants Suite (#22)', (
 
       expect(statusCode).toBe(200);
       expect(jsonResponse.success).toBe(true);
-      expect(jsonResponse.idempotent).toBe(true);
+      expect(jsonResponse.data._id).toBe(bookingId);
       expect(findOneAndUpdateSpy).not.toHaveBeenCalled();
       expect(messageBroker.getPublishedEvents()).toHaveLength(0);
     });
@@ -496,7 +497,10 @@ describe('Task 15: Booking State Machine & Transition Invariants Suite (#22)', (
 
       expect(statusCode).toBe(200);
       expect(jsonResponse.success).toBe(true);
-      expect(jsonResponse.eventPublished).toBe('booking:cancelled');
+      expect(jsonResponse.data.status).toBe('Cancelled');
+      const failPublished = messageBroker.getPublishedEvents();
+      expect(failPublished).toHaveLength(1);
+      expect(failPublished[0].eventType).toBe('booking:cancelled');
       expect(releaseBookingAddOns).toHaveBeenCalledWith(mockBooking, mockSession);
     });
 
