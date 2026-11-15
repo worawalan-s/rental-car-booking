@@ -149,6 +149,7 @@ class MessageBrokerService extends EventEmitter {
     const elapsedNs = process.hrtime.bigint() - startNs;
     const latencyMs = Number(elapsedNs) / 1e6;
     const withinSla = latencyMs <= PUBLISH_SLA_MS;
+    event.latencyMs = latencyMs;
 
     logger.info(
       `Domain event published: ${eventType} for booking ${bookingId} (${previousStatus} -> ${newStatus}) via ${broker} in ${latencyMs.toFixed(3)}ms [SLA <= ${PUBLISH_SLA_MS}ms: ${withinSla ? 'PASS' : 'EXCEEDED'}]`

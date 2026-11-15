@@ -792,7 +792,6 @@ exports.handlePaymentWebhook = async (req, res, next) => {
       await safeCommit(session);
       return res.status(200).json({
         success: true,
-        idempotent: true,
         data: booking,
       });
     }
@@ -811,15 +810,7 @@ exports.handlePaymentWebhook = async (req, res, next) => {
       });
     }
 
-    // 3. If webhook transitions to terminal status (e.g. payment.failed -> Cancelled), release add-ons
-    if (
-      isTerminalStatus(webhookTarget.targetStatus) &&
-      isActiveStatus(previousStatus)
-    ) {
-      await releaseBookingAddOns(booking, session);
-    }
-
-    // 4. Atomic Compare-and-Swap update guarded by current status and eventId absence to prevent race conditions
+    // 3. Atomic Compare-and-Swap update guarded by current status and eventId absence to prevent race conditions
     const updateOptions = session
       ? { returnDocument: 'after', session, runValidators: true }
       : { returnDocument: 'after', runValidators: true };
@@ -853,7 +844,6 @@ exports.handlePaymentWebhook = async (req, res, next) => {
       ) {
         return res.status(200).json({
           success: true,
-          idempotent: true,
           data: latestBooking,
         });
       }
@@ -863,10 +853,18 @@ exports.handlePaymentWebhook = async (req, res, next) => {
       });
     }
 
+    // 4. If webhook transitioned to terminal status (e.g. payment.failed -> Cancelled), release add-ons
+    if (
+      isTerminalStatus(webhookTarget.targetStatus) &&
+      isActiveStatus(previousStatus)
+    ) {
+      await releaseBookingAddOns(booking, session);
+    }
+
     await safeCommit(session);
 
     // 5. Publish domain event to Message Broker within 50ms SLA
-    const publishResult = await messageBroker.publishBookingEvent({
+    await messageBroker.publishBookingEvent({
       bookingId: updatedBooking._id,
       previousStatus,
       newStatus: updatedBooking.status,
@@ -880,9 +878,6 @@ exports.handlePaymentWebhook = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      idempotent: false,
-      eventPublished: publishResult.event.eventType,
-      publishLatencyMs: publishResult.latencyMs,
       data: updatedBooking,
     });
   } catch (err) {
@@ -938,10 +933,6 @@ exports.progressBookingsByTimeline = async (req, res, next) => {
       const previousStatus = booking.status;
       const targetStatus = evalResult.targetStatus;
 
-      if (isTerminalStatus(targetStatus) && isActiveStatus(previousStatus)) {
-        await releaseBookingAddOns(booking, session);
-      }
-
       const updated = await Booking.findOneAndUpdate(
         {
           _id: booking._id,
@@ -957,6 +948,10 @@ exports.progressBookingsByTimeline = async (req, res, next) => {
       );
 
       if (updated) {
+        if (isTerminalStatus(targetStatus) && isActiveStatus(previousStatus)) {
+          await releaseBookingAddOns(booking, session);
+        }
+
         if (targetStatus === 'Active') activatedCount += 1;
         if (targetStatus === 'Completed') completedCount += 1;
 
