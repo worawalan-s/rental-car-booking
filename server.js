@@ -32,6 +32,23 @@ connectDB();
 
 const app = express();
 
+// Express 5 compatibility: allow express-mongo-sanitize to sanitize req.query
+const queryDescriptor = Object.getOwnPropertyDescriptor(express.request, 'query');
+if (queryDescriptor && !queryDescriptor.set) {
+  Object.defineProperty(express.request, 'query', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return this._sanitizedQuery !== undefined
+        ? this._sanitizedQuery
+        : queryDescriptor.get.call(this);
+    },
+    set(val) {
+      this._sanitizedQuery = val;
+    },
+  });
+}
+
 // Body parser
 app.use(express.json());
 
