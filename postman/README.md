@@ -6,7 +6,7 @@ This directory contains the course-aligned **Postman Collection** and **Environm
 
 ## 📁 Files Included
 
-- **`rental-car-presentation.collection.json`**: Postman v2.1 Collection strictly mapped 1:1 to **Google Sheet Presentation Steps (Step 01 - Step 12)** for the 7-minute grading presentation. Covers 21 requests and 42 assertions running completely green in < 5 seconds.
+- **`rental-car-presentation.collection.json`**: Postman v2.1 Collection strictly mapped 1:1 to **Google Sheet Presentation Steps (Step 01 - Step 12 + Step 15 Extra Credits Demo)** for the 7-minute grading presentation. Covers 29 requests and 58 assertions running completely green in ~4.4 seconds across all core requirements and all 6 advanced requirements (Redis Cache, Faceted Search, Pricing Engine, Add-On Pessimistic Lock, Driver License Upload, and Payment Webhook State Machine).
 - **`rental-car-stage1-2.collection.json`**: Postman v2.1 Collection covering **68 comprehensive requests** with **138 automated assertions**, schema validation, SLA thresholds, and domain invariant tests across 8 modules.
 - **`rental-car-local.environment.json`**: Pre-configured environment variables for local testing (`http://localhost:5003`).
 - **`fixtures/sample_license.png`**: Lightweight test image fixture for driver's license upload validation.
