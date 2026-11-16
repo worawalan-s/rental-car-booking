@@ -46,6 +46,22 @@ const BookingSchema = new mongoose.Schema({
     },
     default: 'Pending',
   },
+  paymentStatus: {
+    type: String,
+    enum: {
+      values: ['Unpaid', 'Paid', 'Failed', 'Refunded'],
+      message: '{VALUE} is not a valid payment status',
+    },
+    default: 'Unpaid',
+  },
+  processedWebhookEvents: {
+    type: [String],
+    default: [],
+  },
+  lastTransitionAt: {
+    type: Date,
+    default: Date.now,
+  },
   totalPrice: {
     type: Number,
     default: 0,
@@ -87,8 +103,9 @@ const BookingSchema = new mongoose.Schema({
   },
 });
 
-// Compound indexes for user quota checks and car availability verification
+// Compound indexes for user quota checks, car availability verification, and timeline progression
 BookingSchema.index({ user: 1, status: 1 });
 BookingSchema.index({ car: 1, startDate: 1, endDate: 1 });
+BookingSchema.index({ status: 1, startDate: 1, endDate: 1 });
 
 module.exports = mongoose.model('Booking', BookingSchema);
