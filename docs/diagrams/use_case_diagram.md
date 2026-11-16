@@ -1,5 +1,7 @@
 # Rental Car Booking Platform: Use Case Diagram
 
+> **Rendered Asset Path**: `docs/diagrams/use_case_diagram.png` (Presentation Slide 5)
+
 ```mermaid
 flowchart LR
     subgraph Actors

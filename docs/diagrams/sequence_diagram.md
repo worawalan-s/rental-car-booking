@@ -1,5 +1,7 @@
 # Rental Car Booking Platform: Sequence Diagram
 
+> **Rendered Asset Path**: `docs/diagrams/sequence_diagram.png` (Presentation Slide 9)
+
 ```mermaid
 sequenceDiagram
     autonumber

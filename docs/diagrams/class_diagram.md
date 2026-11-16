@@ -1,5 +1,7 @@
 # Rental Car Booking Platform: UML Class Diagram
 
+> **Rendered Asset Path**: `docs/diagrams/class_diagram.png` (Presentation Slide 7)
+
 ```mermaid
 classDiagram
     direction TB
