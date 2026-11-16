@@ -11,16 +11,21 @@ skinparam shadowing false
 skinparam defaultFontName "Helvetica, Arial, sans-serif"
 skinparam defaultFontSize 11
 
+skinparam classAttributeIconSize 0
+
 skinparam class {
     BackgroundColor #0F172A
-    BorderColor #0EA5E9
-    BorderThickness 1.8
+    BorderColor #38BDF8
+    BorderThickness 2
     HeaderBackgroundColor #1E293B
     FontColor #FFFFFF
     FontSize 14
     FontStyle bold
     AttributeFontColor #FFFFFF
     AttributeFontSize 12
+    StereotypeFontColor #38BDF8
+    StereotypeFontSize 11
+    StereotypeFontStyle italic
 }
 
 skinparam stereotypeCBackgroundColor #0284C7
@@ -28,12 +33,12 @@ skinparam stereotypeCFontColor #FFFFFF
 
 skinparam arrow {
     Color #38BDF8
-    Thickness 1.8
-    FontColor #94A3B8
+    Thickness 2
+    FontColor #E2E8F0
     FontSize 10
 }
 
-class User <<Mongoose Model>> {
+class User <<Entity>> {
     -_id: ObjectId
     +name: String
     +tel: String [Regex: /^0[0-9]{9}$/]
@@ -47,7 +52,7 @@ class User <<Mongoose Model>> {
     +getSignedJwtToken(): String
 }
 
-class Provider <<Mongoose Model>> {
+class Provider <<Entity>> {
     -_id: ObjectId
     +name: String [unique, trim]
     +address: String
@@ -60,7 +65,7 @@ class Provider <<Mongoose Model>> {
     +Redis cache key: 'providers:all'
 }
 
-class Car <<Mongoose Model>> {
+class Car <<Entity>> {
     -_id: ObjectId
     +brand: String
     +model: String
@@ -76,7 +81,7 @@ class Car <<Mongoose Model>> {
     +existingStart < newEnd && existingEnd > newStart
 }
 
-class Booking <<Mongoose Model>> {
+class Booking <<Entity>> {
     -_id: ObjectId
     +user: ObjectId <<Ref: User>>
     +car: ObjectId <<Ref: Car>>
@@ -90,7 +95,7 @@ class Booking <<Mongoose Model>> {
     +createdAt: Date
 }
 
-class AddOn <<Mongoose Model>> {
+class AddOn <<Entity>> {
     -_id: ObjectId
     +name: String [GPS, Child Seat, WiFi]
     +category: String
@@ -103,7 +108,7 @@ class AddOn <<Mongoose Model>> {
     +createdAt: Date
 }
 
-class BookingAddOn <<Embedded Subdocument>> {
+class BookingAddOn <<Entity>> {
     +addOn: ObjectId <<Ref: AddOn>>
     +quantity: Number [min: 1]
     +price: Number [Satang Integer at booking]
