@@ -1,6 +1,6 @@
 # Rental Car Booking Platform: Sequence Diagram
 
-![Booking Creation Sequence Diagram](./sequence_diagram.png)
+> **Rendered Asset Path**: `docs/diagrams/sequence_diagram.png` (Presentation Slide 9)
 
 ```mermaid
 sequenceDiagram
