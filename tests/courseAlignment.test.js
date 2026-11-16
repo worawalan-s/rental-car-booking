@@ -8,7 +8,7 @@ const {
   validateBookingPayload,
   validateNestedCarId,
 } = require('../middleware/validate');
-const { getCar } = require('../controllers/cars');
+const { getCar, getCars } = require('../controllers/cars');
 const {
   getBookings,
   getBooking,
@@ -457,6 +457,37 @@ describe('Phase 2 Course Alignment (Issue #15)', () => {
         success: false,
         message: 'Cannot retrieve or update car',
       });
+    });
+  });
+
+  describe('Query Filter Operator Safety (Safe Operator Replacement)', () => {
+    it('safely maps comparison operators ($lte) without corrupting string values containing "in"', async () => {
+      const mockChain = {
+        populate: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        then: (resolve) => resolve([]),
+      };
+      jest.spyOn(Car, 'find').mockReturnValue(mockChain);
+      jest.spyOn(Car, 'countDocuments').mockResolvedValue(0);
+
+      const req = {
+        query: {
+          model: 'All in One',
+          dailyRate: { lte: '200000' },
+        },
+      };
+      const res = createMockRes();
+
+      await getCars(req, res, jest.fn());
+
+      expect(Car.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'All in One',
+          dailyRate: { $lte: '200000' },
+        })
+      );
     });
   });
 });

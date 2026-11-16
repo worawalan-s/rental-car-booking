@@ -4,6 +4,12 @@ const Car = require("../models/Car");
 const Booking = require("../models/Booking");
 const AddOn = require("../models/AddOn");
 const redisClient = require("../config/redis");
+const {
+  createSafeSession,
+  safeAbort,
+  safeCommit,
+  safeEnd,
+} = require("../utils/transaction");
 
 // Helper to format clean, safe error messages without leaking database internals
 const formatProviderError = (err, req) => {
@@ -211,16 +217,14 @@ exports.updateProvider = async (req, res, next) => {
 // @route    DELETE /api/v1/providers/:id
 // @access   Private (Admin only)
 exports.deleteProvider = async (req, res, next) => {
-  const session = await mongoose.startSession();
+  const session = await createSafeSession();
   try {
-    session.startTransaction();
-
-    const provider = await Provider.findById(req.params.id).session(session);
+    const provider = await (session
+      ? Provider.findById(req.params.id).session(session)
+      : Provider.findById(req.params.id));
 
     if (!provider) {
-      if (session.inTransaction()) {
-        await session.abortTransaction();
-      }
+      await safeAbort(session);
       return res.status(404).json({
         success: false,
         message: `Provider not found with id of ${req.params.id}`,
@@ -228,23 +232,22 @@ exports.deleteProvider = async (req, res, next) => {
     }
 
     // Cascade delete bookings, add-ons, and cars belonging to this provider atomically
-    await Booking.deleteMany({ provider: req.params.id }, { session });
-    await AddOn.deleteMany({ provider: req.params.id }, { session });
-    await Car.deleteMany({ provider: req.params.id }, { session });
-    await Provider.deleteOne({ _id: req.params.id }, { session });
+    const deleteOptions = session ? { session } : {};
+    await Booking.deleteMany({ provider: req.params.id }, deleteOptions);
+    await AddOn.deleteMany({ provider: req.params.id }, deleteOptions);
+    await Car.deleteMany({ provider: req.params.id }, deleteOptions);
+    await Provider.deleteOne({ _id: req.params.id }, deleteOptions);
 
-    await session.commitTransaction();
+    await safeCommit(session);
 
     // Invalidate provider cache on deletion
     await redisClient.clearPattern("providers:*");
 
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
+    await safeAbort(session);
     return handleProviderError(err, req, res);
   } finally {
-    session.endSession();
+    safeEnd(session);
   }
 };
