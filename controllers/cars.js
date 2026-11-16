@@ -4,6 +4,12 @@ const Provider = require('../models/Provider');
 const Booking = require('../models/Booking');
 const redisClient = require('../config/redis');
 const { releaseBookingAddOns } = require('../utils/bookingInventory');
+const {
+  createSafeSession,
+  safeAbort,
+  safeCommit,
+  safeEnd,
+} = require('../utils/transaction');
 
 // @desc      Get all cars
 // @route     GET /api/v1/cars
@@ -38,10 +44,10 @@ exports.getCars = async (req, res, next) => {
     // Create query string
     let queryStr = JSON.stringify(reqQuery);
 
-    // Create operators ($gt, $gte, $lt, $lte, $in)
+    // Create operators ($gt, $gte, $lt, $lte, $in) safely matching key tokens only
     queryStr = queryStr.replace(
-      /\b(gt|gte|lt|lte|in)\b/g,
-      (match) => `$${match}`
+      /"(gt|gte|lt|lte|in)":/g,
+      (match, op) => `"$${op}":`
     );
 
     const parsedQuery = JSON.parse(queryStr);
@@ -237,14 +243,14 @@ exports.updateCar = async (req, res, next) => {
 // @route     DELETE /api/v1/cars/:id
 // @access    Private (Admin only)
 exports.deleteCar = async (req, res, next) => {
-  const session = await mongoose.startSession();
+  const session = await createSafeSession();
   try {
-    session.startTransaction();
-
-    const car = await Car.findById(req.params.id).session(session);
+    const car = await (session
+      ? Car.findById(req.params.id).session(session)
+      : Car.findById(req.params.id));
 
     if (!car) {
-      await session.abortTransaction();
+      await safeAbort(session);
       return res.status(404).json({
         success: false,
         message: `Car not found with id of ${req.params.id}`,
@@ -252,20 +258,26 @@ exports.deleteCar = async (req, res, next) => {
     }
 
     // Restore allocated physical add-on stock for active bookings before cascade delete
-    const activeBookings = await Booking.find({
-      car: req.params.id,
-      status: { $in: ['Pending', 'Confirmed', 'Active'] },
-    }).session(session);
+    const activeBookings = await (session
+      ? Booking.find({
+          car: req.params.id,
+          status: { $in: ['Pending', 'Confirmed', 'Active'] },
+        }).session(session)
+      : Booking.find({
+          car: req.params.id,
+          status: { $in: ['Pending', 'Confirmed', 'Active'] },
+        }));
 
     for (const booking of activeBookings) {
       await releaseBookingAddOns(booking, session);
     }
 
     // Cascade delete associated bookings (Assignment 7.2 pattern)
-    await Booking.deleteMany({ car: req.params.id }, { session });
-    await Car.deleteOne({ _id: req.params.id }, { session });
+    const deleteOptions = session ? { session } : {};
+    await Booking.deleteMany({ car: req.params.id }, deleteOptions);
+    await Car.deleteOne({ _id: req.params.id }, deleteOptions);
 
-    await session.commitTransaction();
+    await safeCommit(session);
 
     // Invalidate provider cache as populated cars changed
     await redisClient.clearPattern('providers:*');
@@ -275,12 +287,10 @@ exports.deleteCar = async (req, res, next) => {
       data: {},
     });
   } catch (err) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
+    await safeAbort(session);
     return handleCarError(res, err, 'Cannot delete car');
   } finally {
-    session.endSession();
+    safeEnd(session);
   }
 };
 

@@ -14,6 +14,12 @@ const {
   evaluateTimelineTransition,
 } = require('../utils/bookingStateMachine');
 const messageBroker = require('../config/messageBroker');
+const {
+  createSafeSession,
+  safeAbort,
+  safeCommit,
+  safeEnd,
+} = require('../utils/transaction');
 
 /**
  * Standardizes Mongoose ValidationError, CastError, and 500 error responses for booking endpoints
@@ -85,64 +91,6 @@ const checkBookingCollision = async ({
 
   const existingBooking = await queryBuilder;
   return Boolean(existingBooking);
-};
-
-/**
- * Safely initializes a Mongoose transaction session if supported by the deployment topology
- * (ReplicaSet or Sharded Cluster, like MongoDB Atlas). On standalone local instances (Single),
- * returns null so operations succeed without error code 20 IllegalOperation.
- */
-const createSafeSession = async () => {
-  try {
-    const topologyType =
-      mongoose.connection?.client?.topology?.description?.type;
-    if (topologyType === 'Single') {
-      return null;
-    }
-    const session = await mongoose.startSession();
-    if (session && typeof session.startTransaction === 'function') {
-      session.startTransaction();
-    }
-    return session;
-  } catch (err) {
-    return null;
-  }
-};
-
-const safeAbort = async (session) => {
-  if (session && typeof session.abortTransaction === 'function') {
-    try {
-      if (
-        typeof session.inTransaction === 'function'
-          ? session.inTransaction()
-          : true
-      ) {
-        await session.abortTransaction();
-      }
-    } catch (_) {}
-  }
-};
-
-const safeCommit = async (session) => {
-  if (session && typeof session.commitTransaction === 'function') {
-    try {
-      if (
-        typeof session.inTransaction === 'function'
-          ? session.inTransaction()
-          : true
-      ) {
-        await session.commitTransaction();
-      }
-    } catch (_) {}
-  }
-};
-
-const safeEnd = (session) => {
-  if (session && typeof session.endSession === 'function') {
-    try {
-      session.endSession();
-    } catch (_) {}
-  }
 };
 
 /**
