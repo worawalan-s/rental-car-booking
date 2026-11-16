@@ -1,12 +1,12 @@
 # Rental Car Booking Platform: Use Case Diagram
 
-> **Rendered Asset Path**: `docs/diagrams/use_case_diagram.png` (Presentation Slide 5)  
-> **PlantUML Source**: `docs/diagrams/use_case_diagram.puml`
+> **Rendered Diagram**: [use_case_diagram.png](./use_case_diagram.png) (Presentation Slide 5)  
+> **PlantUML Source**: [use_case_diagram.puml](./use_case_diagram.puml)
 
 ```plantuml
 @startuml use_case_diagram
 skinparam BackgroundColor #0B1120
-skinparam roundcorner 12
+skinparam roundcorner 10
 skinparam shadowing false
 skinparam defaultFontName "Helvetica, Arial, sans-serif"
 skinparam defaultFontSize 12
@@ -31,10 +31,10 @@ skinparam rectangle {
 
 skinparam usecase {
     BackgroundColor #1E293B
-    BorderColor #0EA5E9
+    BorderColor #38BDF8
     BorderThickness 1.8
     FontColor #F8FAFC
-    FontSize 11
+    FontSize 12
 }
 
 skinparam actor {
@@ -52,63 +52,75 @@ skinparam arrow {
     FontSize 10
 }
 
-left to right direction
-
-actor "👤 Registered User\n(Renter)" as User #1E293B
-actor "👮 Administrator\n(Platform Admin)" as Admin #2A1D0B
+actor "👤 Registered User
+(Renter)" as User
+actor "👮 Administrator
+(Platform Admin)" as Admin
 
 rectangle "Rental Car Booking Platform (System Boundary)" {
 
-    package "1. Authentication & Profile" {
+    package "1. Authentication & Profile" as P1 {
         usecase "UC-01: Register Account" as UC_Reg
         usecase "UC-02: Login & Receive JWT" as UC_Login
         usecase "UC-03: Logout & Clear Cookie" as UC_Logout
-        usecase "UC-04: Upload Driver License\n(Adv Req 5 - AWS S3)" as UC_UploadDoc #2E1065
+        usecase "UC-04: Upload Driver License
+(Adv Req 5 - AWS S3)" as UC_UploadDoc
     }
 
-    package "2. Catalog, Providers & Pricing" {
+    package "2. Catalog, Providers & Pricing" as P2 {
         usecase "UC-05: Browse Available Cars" as UC_ViewCars
-        usecase "UC-06: Faceted Search & Filtering\n(Adv Req 2 - MongoDB $facet)" as UC_SearchFacet #2E1065
+        usecase "UC-06: Faceted Search & Filtering
+(Adv Req 2 - MongoDB )" as UC_SearchFacet
         usecase "UC-07: Browse Rental Providers" as UC_ViewProviders
-        usecase "UC-08: Calculate Rental Quote\n(Adv Req 3 - Satang Integer & 7% VAT)" as UC_CalcPrice #2E1065
-        usecase "UC-09: Manage Providers\n(Adv Req 1 - Redis Cache Invalidation)" as UC_ManageProviders #3D2605
-        usecase "UC-10: Manage Vehicles Catalog" as UC_ManageCars #3D2605
+        usecase "UC-08: Calculate Rental Quote
+(Adv Req 3 - Satang & 7% VAT)" as UC_CalcPrice
+        usecase "UC-09: Manage Providers
+(Adv Req 1 - Redis Cache)" as UC_ManageProviders
+        usecase "UC-10: Manage Vehicles Catalog" as UC_ManageCars
     }
 
-    package "3. Booking Lifecycle & ACID Concurrency" {
-        usecase "UC-11: Create Booking\n(Cumulative 3-Car Quota Guard)" as UC_CreateBooking #0C4A6E
-        usecase "UC-12: Reserve Add-Ons\n(Adv Req 4 - ACID Pessimistic Lock)" as UC_LockAddon #2E1065
-        usecase "UC-13: View Personal Bookings\n(Ownership Scoped)" as UC_ViewOwn
-        usecase "UC-14: Cancel Personal Booking\n(Inventory Reclamation)" as UC_CancelOwn
-        usecase "UC-15: Supervise Global Bookings" as UC_ViewAll #3D2605
-        usecase "UC-16: Update Booking Status\n(State Machine - Adv Req 6)" as UC_UpdateStatus #3D2605
-        usecase "UC-17: Hard Delete Any Booking\n(Cascade Deletion)" as UC_DeleteBooking #450A0A
+    package "3. Booking Lifecycle & ACID Concurrency" as P3 {
+        usecase "UC-11: Create Booking
+(Cumulative 3-Car Quota)" as UC_CreateBooking
+        usecase "UC-12: Reserve Add-Ons
+(Adv Req 4 - ACID Lock)" as UC_LockAddon
+        usecase "UC-13: View Personal Bookings
+(Ownership Scoped)" as UC_ViewOwn
+        usecase "UC-14: Cancel Personal Booking
+(Inventory Reclamation)" as UC_CancelOwn
+        usecase "UC-15: Supervise Global Bookings" as UC_ViewAll
+        usecase "UC-16: Update Booking Status
+(State Machine - Adv Req 6)" as UC_UpdateStatus
+        usecase "UC-17: Hard Delete Any Booking
+(Cascade Deletion)" as UC_DeleteBooking
     }
 
+    P1 -[hidden]right-> P2
+    P2 -[hidden]right-> P3
     UC_CreateBooking .> UC_LockAddon : <<include>>
 }
 
 ' User Associations
-User --> UC_Reg
-User --> UC_Login
-User --> UC_Logout
-User --> UC_UploadDoc
-User --> UC_ViewCars
-User --> UC_SearchFacet
-User --> UC_ViewProviders
-User --> UC_CalcPrice
-User --> UC_CreateBooking #38BDF8
-User --> UC_ViewOwn
-User --> UC_CancelOwn
+User -right-> UC_Reg
+User -right-> UC_Login
+User -right-> UC_Logout
+User -right-> UC_UploadDoc
+User -right-> UC_ViewCars
+User -right-> UC_SearchFacet
+User -right-> UC_ViewProviders
+User -right-> UC_CalcPrice
+User -right-> UC_CreateBooking
+User -right-> UC_ViewOwn
+User -right-> UC_CancelOwn
 
 ' Admin Associations
-Admin --> UC_Login #F59E0B
-Admin --> UC_Logout #F59E0B
-Admin --> UC_ManageProviders #F59E0B
-Admin --> UC_ManageCars #F59E0B
-Admin --> UC_ViewAll #F59E0B
-Admin --> UC_UpdateStatus #F59E0B
-Admin --> UC_DeleteBooking #EF4444
+Admin -left-> UC_Login
+Admin -left-> UC_Logout
+Admin -left-> UC_ManageProviders
+Admin -left-> UC_ManageCars
+Admin -left-> UC_ViewAll
+Admin -left-> UC_UpdateStatus
+Admin -left-> UC_DeleteBooking
 
 @enduml
 ```
