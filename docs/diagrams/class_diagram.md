@@ -1,7 +1,7 @@
 # Rental Car Booking Platform: UML Class Diagram
 
-> **Rendered Asset Path**: `docs/diagrams/class_diagram.png` (Presentation Slide 7)  
-> **PlantUML Source**: `docs/diagrams/class_diagram.puml`
+> **Rendered Diagram**: [class_diagram.png](./class_diagram.png) (Presentation Slide 8)  
+> **PlantUML Source**: [class_diagram.puml](./class_diagram.puml)
 
 ```plantuml
 @startuml class_diagram

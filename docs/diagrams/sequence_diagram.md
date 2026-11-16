@@ -1,7 +1,7 @@
 # Rental Car Booking Platform: Sequence Diagram
 
-> **Rendered Asset Path**: `docs/diagrams/sequence_diagram.png` (Presentation Slide 9)  
-> **PlantUML Source**: `docs/diagrams/sequence_diagram.puml`
+> **Rendered Diagram**: [sequence_diagram.png](./sequence_diagram.png) (Presentation Slide 10)  
+> **PlantUML Source**: [sequence_diagram.puml](./sequence_diagram.puml)
 
 ```plantuml
 @startuml sequence_diagram

@@ -1,7 +1,7 @@
 # Rental Car Booking Platform: Use Case Diagram
 
-> **Rendered Asset Path**: `docs/diagrams/use_case_diagram.png` (Presentation Slide 5)  
-> **PlantUML Source**: `docs/diagrams/use_case_diagram.puml`
+> **Rendered Diagram**: [use_case_diagram.png](./use_case_diagram.png) (Presentation Slide 5)  
+> **PlantUML Source**: [use_case_diagram.puml](./use_case_diagram.puml)
 
 ```plantuml
 @startuml use_case_diagram
