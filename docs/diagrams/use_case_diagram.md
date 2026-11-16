@@ -1,5 +1,7 @@
 # Rental Car Booking Platform: Use Case Diagram
 
+![Use Case Diagram](./use_case_diagram.png)
+
 ```mermaid
 flowchart LR
     subgraph Actors

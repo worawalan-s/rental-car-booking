@@ -1,5 +1,7 @@
 # Rental Car Booking Platform: Sequence Diagram
 
+![Booking Creation Sequence Diagram](./sequence_diagram.png)
+
 ```mermaid
 sequenceDiagram
     autonumber

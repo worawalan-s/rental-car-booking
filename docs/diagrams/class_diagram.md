@@ -1,5 +1,7 @@
 # Rental Car Booking Platform: UML Class Diagram
 
+![UML Class Diagram](./class_diagram.png)
+
 ```mermaid
 classDiagram
     direction TB
