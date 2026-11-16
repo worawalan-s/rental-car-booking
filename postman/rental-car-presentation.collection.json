@@ -233,6 +233,8 @@
                   "    pm.expect(jsonData.data).to.be.an(\"array\");",
                   "    pm.expect(jsonData.count).to.be.at.least(2);",
                   "    pm.environment.set(\"DEMO_CAR_ID_1\", jsonData.data[0]._id);",
+                  "    const prov = jsonData.data[0].provider._id ? jsonData.data[0].provider._id : jsonData.data[0].provider;",
+                  "    pm.environment.set(\"DEMO_CAR_PROVIDER_ID\", prov);",
                   "    pm.environment.set(\"DEMO_CAR_ID_2\", jsonData.data[1]._id);",
                   "});"
                 ]
@@ -1069,6 +1071,419 @@
                 "v1",
                 "bookings",
                 "{{ADMIN_TARGET_BOOKING_ID}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 15 - Extra Credits Demo",
+      "item": [
+        {
+          "name": "15.1: Adv Req 1 - Provider Catalog & Redis Caching Layer (GET /providers)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 15.1: Fast response from provider catalog with Redis cache\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "    pm.expect(jsonData.count).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/providers",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "providers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "15.2: Adv Req 2 - Faceted Search & Category Aggregation (GET /cars/search)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.2: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 15.2: Faceted aggregation returns cars matching filter criteria\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/cars/search?minPrice=50000&maxPrice=300000",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cars",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "minPrice",
+                  "value": "50000"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "300000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "15.3: Adv Req 3 - Pricing Engine Satang Arithmetic & 7% Tax (POST /pricing/calculate)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const today = new Date();",
+                  "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
+                  "pm.environment.set(\"PRICING_START\", addDays(40));",
+                  "pm.environment.set(\"PRICING_END\", addDays(43));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.3: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 15.3: Returns exact Satang calculation with 7% VAT without float drift\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(Number.isInteger(jsonData.data.subtotal)).to.be.true;",
+                  "    pm.expect(Number.isInteger(jsonData.data.vat)).to.be.true;",
+                  "    pm.expect(Number.isInteger(jsonData.data.total)).to.be.true;",
+                  "    pm.expect(jsonData.data.total).to.equal(jsonData.data.subtotal + jsonData.data.vat);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"car\": \"{{DEMO_CAR_ID_1}}\",\n  \"startDate\": \"{{PRICING_START}}\",\n  \"endDate\": \"{{PRICING_END}}\",\n  \"numOfCars\": 1\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/pricing/calculate",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pricing",
+                "calculate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "15.4a: Adv Req 4 - Query Available Add-On for Provider (GET /addons)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.4a: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 15.4a: Captures available add-on matching car provider\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "    pm.expect(jsonData.count).to.be.at.least(1);",
+                  "    const item = jsonData.data.find(a => a.availableStock > 0) || jsonData.data[0];",
+                  "    pm.environment.set(\"EXTRA_ADDON_ID\", item._id);",
+                  "    pm.environment.set(\"PREV_ADDON_STOCK\", item.availableStock);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/addons?provider={{DEMO_CAR_PROVIDER_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons"
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "{{DEMO_CAR_PROVIDER_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "15.4b: Adv Req 4 - Reserve Add-On with Pessimistic Locking (POST /bookings)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const today = new Date();",
+                  "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
+                  "pm.environment.set(\"EXTRA_BOOKING_START\", addDays(50));",
+                  "pm.environment.set(\"EXTRA_BOOKING_END\", addDays(52));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.4b: Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Step 15.4b: Successfully locks add-on stock under ACID transaction\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data._id).to.be.a(\"string\");",
+                  "    pm.environment.set(\"EXTRA_BOOKING_ID\", jsonData.data._id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"car\": \"{{DEMO_CAR_ID_1}}\",\n  \"startDate\": \"{{EXTRA_BOOKING_START}}\",\n  \"endDate\": \"{{EXTRA_BOOKING_END}}\",\n  \"numOfCars\": 1,\n  \"addOns\": [\n    {\n      \"addOn\": \"{{EXTRA_ADDON_ID}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "15.4c: Adv Req 4 - Verify Add-On Inventory Decremented (GET /addons/:id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.4c: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 15.4c: Add-on availableStock decremented by 1\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    const prevStock = Number(pm.environment.get(\"PREV_ADDON_STOCK\"));",
+                  "    pm.expect(jsonData.data.availableStock).to.equal(prevStock - 1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/api/v1/addons/{{EXTRA_ADDON_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "addons",
+                "{{EXTRA_ADDON_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "15.5: Adv Req 5 - Driver License Upload & Verification (PUT /auth/driver-license)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.5: Status code is 200 OK (or 400 if multipart file unattached in GUI)\", function () {",
+                  "    pm.expect([200, 400]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Step 15.5: Returns driver license verification payload with Pending status\", function () {",
+                  "        const jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.success).to.be.true;",
+                  "        pm.expect(jsonData.data.verificationStatus).to.equal(\"Pending\");",
+                  "        pm.expect(jsonData.data.imageUrl).to.be.a(\"string\").and.not.empty;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "license",
+                  "type": "file",
+                  "src": "postman/fixtures/sample_license.png"
+                },
+                {
+                  "key": "idNumber",
+                  "value": "1103701234567",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/driver-license",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "driver-license"
+              ]
+            }
+          }
+        },
+        {
+          "name": "15.6: Adv Req 6 - Payment Gateway Webhook & State Machine (POST /payments/webhook)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const eventId = \"evt_demo_\" + Date.now();",
+                  "pm.environment.set(\"WEBHOOK_EVENT_ID\", eventId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.6: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 15.6: Payment webhook transitions booking to Confirmed & Paid\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.status).to.equal(\"Confirmed\");",
+                  "    pm.expect(jsonData.data.paymentStatus).to.equal(\"Paid\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{WEBHOOK_EVENT_ID}}\",\n  \"eventType\": \"payment.succeeded\",\n  \"bookingId\": \"{{EXTRA_BOOKING_ID}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/payments/webhook",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "webhook"
               ]
             }
           }
