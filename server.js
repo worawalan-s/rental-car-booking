@@ -3,6 +3,12 @@ const path = require('path');
 const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
+const mongoSanitize = require('express-mongo-sanitize');
+const helmet = require('helmet');
+const { xss } = require('express-xss-sanitizer');
+const rateLimit = require('express-rate-limit');
+const hpp = require('hpp');
+const cors = require('cors');
 const connectDB = require('./config/db');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/error');
@@ -26,8 +32,47 @@ connectDB();
 
 const app = express();
 
+// Express 5 compatibility: allow express-mongo-sanitize to sanitize req.query
+const queryDescriptor = Object.getOwnPropertyDescriptor(express.request, 'query');
+if (queryDescriptor && !queryDescriptor.set) {
+  Object.defineProperty(express.request, 'query', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return this._sanitizedQuery !== undefined
+        ? this._sanitizedQuery
+        : queryDescriptor.get.call(this);
+    },
+    set(val) {
+      this._sanitizedQuery = val;
+    },
+  });
+}
+
 // Body parser
 app.use(express.json());
+
+// Sanitize data (prevent NoSQL query injection)
+app.use(mongoSanitize());
+
+// Set security headers
+app.use(helmet());
+
+// Prevent XSS attacks
+app.use(xss());
+
+// Rate limiting (windowMs: 10 * 60 * 1000, max: 100)
+const limiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 mins
+  max: 100,
+});
+app.use(limiter);
+
+// Prevent HTTP param pollution
+app.use(hpp());
+
+// Enable CORS
+app.use(cors());
 
 // Cookie parser
 app.use(cookieParser());
@@ -58,6 +103,52 @@ const pricing = require('./routes/pricing');
 const provider = require('./routes/provider');
 const addons = require('./routes/addons');
 const payments = require('./routes/payments');
+
+// Swagger API Documentation (Task 17 / Issue #24 - Course Assignment 12 specification)
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerUI = require('swagger-ui-express');
+
+const swaggerOptions = {
+  swaggerDefinition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Rental Car Booking API',
+      version: '1.0.0',
+      description:
+        'Course-aligned REST API for Rental Car Booking Platform (Software Development Practice 2110503)',
+      contact: {
+        name: 'Minnie & Praise',
+      },
+    },
+    servers: [
+      {
+        url: '/api/v1',
+        description: 'Current Host (Auto-detect Active Port)',
+      },
+      {
+        url: 'http://localhost:5003/api/v1',
+        description: 'Course Evaluation / VacQ Test Server',
+      },
+      {
+        url: 'http://localhost:5000/api/v1',
+        description: 'Local Development Server',
+      },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+  },
+  apis: ['./routes/*.js'],
+};
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerDocs));
 
 // Base health check
 app.get('/api/v1/health', (req, res) => {
