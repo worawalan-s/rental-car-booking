@@ -30,7 +30,7 @@ sequenceDiagram
 
     alt Add-Ons Requested (ACID Locking - Adv Req 4)
         loop Each Requested AddOn
-            Ctrl->>MDB: AddOn.findOneAndUpdate({ _id, availableStock: { $gte: qty } }, { $inc: { availableStock: -qty } })
+            Ctrl->>MDB: AddOn.findOneAndUpdate({ _id, provider, isAvailable: true, availableStock: { $gte: qty } }, { $inc: { allocatedStock: qty, availableStock: -qty } })
             MDB-->>Ctrl: lockedAddOn
             alt Insufficient Stock
                 Ctrl->>MDB: abortTransaction() & endSession()
@@ -39,8 +39,8 @@ sequenceDiagram
         end
     end
 
-    Ctrl->>Pricing: calculateBaselinePrice(dailyRate, duration, addOns)
-    Pricing-->>Ctrl: totalPriceSatang (Fixed-Point VAT 7%)
+    Ctrl->>Pricing: calculateBaselinePrice(dailyRate, durationDays, numOfCars, addOns)
+    Pricing-->>Ctrl: totalPriceSatang (Fixed-Point Satang Integer)
 
     Ctrl->>MDB: Booking.create([bookingPayload], { session })
     MDB-->>Ctrl: newBookingDoc

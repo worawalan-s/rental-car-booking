@@ -22,7 +22,7 @@ classDiagram
         +String address
         +String tel
         +Date createdAt
-        +Car[] cars (Virtual 1:N)
+        +Car[] cars_virtual
     }
 
     class Car {
@@ -30,12 +30,12 @@ classDiagram
         +String brand
         +String model
         +String category
-        +Number dailyRate (Satang int)
+        +Number dailyRate_Satang
         +Number capacity
         +Boolean isAvailable
         +ObjectId provider
         +Date createdAt
-        +Booking[] bookings (Virtual 1:N)
+        +Booking[] bookings_virtual
     }
 
     class Booking {
@@ -45,9 +45,10 @@ classDiagram
         +ObjectId provider
         +Date startDate
         +Date endDate
-        +Number numOfCars (1..3)
-        +String status (Pending|Confirmed|Active|Completed|Cancelled)
-        +Number totalPrice (Satang int)
+        +Number numOfCars
+        +String status
+        +String paymentStatus
+        +Number totalPrice_Satang
         +BookingAddOn[] addOns
         +Date createdAt
     }
@@ -56,8 +57,11 @@ classDiagram
         +ObjectId _id
         +String name
         +String category
-        +Number dailyRate (Satang int)
+        +Number dailyRate_Satang
+        +Number inventoryStock
+        +Number allocatedStock
         +Number availableStock
+        +Boolean isAvailable
         +ObjectId provider
         +Date createdAt
     }
@@ -65,7 +69,7 @@ classDiagram
     class BookingAddOn {
         +ObjectId addOn
         +Number quantity
-        +Number price (Satang int)
+        +Number price_Satang
     }
 
     %% Relationships
