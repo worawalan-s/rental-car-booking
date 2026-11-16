@@ -9,7 +9,9 @@
     "test": "jest --passWithNoTests --runInBand --detectOpenHandles",
     "test:postman": "node scripts/run-postman.js",
     "seed": "node seeder.js -i",
-    "seed:destroy": "node seeder.js -d"
+    "seed:destroy": "node seeder.js -d",
+    "demo": "node scripts/run-presentation.js",
+    "test:presentation": "node scripts/run-presentation.js"
   },
   "author": "Minnie & Praise",
   "license": "ISC",
