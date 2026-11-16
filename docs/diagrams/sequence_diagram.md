@@ -1,52 +1,126 @@
 # Rental Car Booking Platform: Sequence Diagram
 
-> **Rendered Asset Path**: `docs/diagrams/sequence_diagram.png` (Presentation Slide 9)
+> **Rendered Asset Path**: `docs/diagrams/sequence_diagram.png` (Presentation Slide 9)  
+> **PlantUML Source**: `docs/diagrams/sequence_diagram.puml`
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 👤 Renter (Client)
-    participant Router as 🌐 Express Router
-    participant Val as 🛡️ Validation Middleware
-    participant Ctrl as ⚙️ Booking Controller
-    participant MDB as 🗄️ MongoDB (Session)
-    participant Pricing as 🧮 Pricing Engine
+```plantuml
+@startuml sequence_diagram
+autonumber
+skinparam BackgroundColor #0B1120
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam defaultFontName "Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 11
 
-    User->>Router: POST /api/v1/bookings (startDate, endDate, car, addOns)
-    Router->>Val: validateBookingPayload()
-    Note over Val: Validate Date Range (start >= today, end >= start, <= 30d)<br/>Ensure 1 <= numOfCars <= 3
-    Val-->>Router: Validated Payload
+skinparam participant {
+    BackgroundColor #1E293B
+    BorderColor #38BDF8
+    BorderThickness 1.8
+    FontColor #38BDF8
+    FontSize 12
+    FontStyle bold
+}
 
-    Router->>Ctrl: createBooking(req, res)
-    Ctrl->>MDB: startSession() & startTransaction()
+skinparam actor {
+    BackgroundColor #1E293B
+    BorderColor #38BDF8
+    FontColor #38BDF8
+    FontSize 12
+    FontStyle bold
+}
 
-    Ctrl->>MDB: Car.findById(carId)
-    MDB-->>Ctrl: carDoc (Check isAvailable)
+skinparam sequence {
+    ArrowColor #38BDF8
+    ArrowThickness 1.8
+    LifeLineBorderColor #38BDF8
+    LifeLineBackgroundColor #0F172A
+    GroupBorderColor #475569
+    GroupBackgroundColor #131D31
+    GroupHeaderFontColor #38BDF8
+}
 
-    Ctrl->>MDB: checkBookingCollision(carId, startDate, endDate)
-    MDB-->>Ctrl: existingCollision (false)
+skinparam note {
+    BackgroundColor #1E293B
+    BorderColor #F59E0B
+    FontColor #F8FAFC
+    FontSize 10
+}
 
-    Ctrl->>MDB: Booking.find({ user: userId, status: activeStatuses })
-    MDB-->>Ctrl: activeBookings
-    Note over Ctrl: Check Cumulative 3-Car Quota (activeCars + requestedCars <= 3)
+actor "👤 Client\n(Renter)" as User
+participant "🌐 Express Router" as Router
+participant "🛡️ Validation Guard\n(Middleware)" as Val
+participant "⚙️ Booking Controller" as Ctrl
+participant "🗄️ MongoDB Session\n(ACID Transaction)" as MDB
+participant "🧮 Pricing Engine\n(Fixed-Point Satang)" as Pricing
 
-    alt Add-Ons Requested (ACID Locking - Adv Req 4)
-        loop Each Requested AddOn
-            Ctrl->>MDB: AddOn.findOneAndUpdate({ _id, provider, isAvailable: true, availableStock: { $gte: qty } }, { $inc: { allocatedStock: qty, availableStock: -qty } })
-            MDB-->>Ctrl: lockedAddOn
-            alt Insufficient Stock
-                Ctrl->>MDB: abortTransaction() & endSession()
-                Ctrl-->>User: 400 Bad Request ("Insufficient add-on stock")
-            end
+User -> Router : POST /api/v1/bookings\n{ startDate, endDate, car, numOfCars, addOns }
+activate Router
+
+Router -> Val : validateBookingPayload(req)
+activate Val
+note over Val
+  Check Invariants:
+  - start >= today
+  - end >= start, duration <= 30d
+  - 1 <= numOfCars <= 3
+end note
+Val --> Router : Validated Request
+deactivate Val
+
+Router -> Ctrl : createBooking(req, res)
+activate Ctrl
+
+Ctrl -> MDB : startSession() & startTransaction()
+activate MDB
+
+Ctrl -> MDB : Car.findById(carId)
+MDB --> Ctrl : carDoc (isAvailable: true)
+
+Ctrl -> MDB : checkBookingCollision(carId, startDate, endDate)
+note over Ctrl
+  Formula:
+  existingStart < newEnd && existingEnd > newStart
+end note
+MDB --> Ctrl : existingCollision (false)
+
+Ctrl -> MDB : Booking.find({ user: userId, status: activeStatuses })
+note over Ctrl
+  Cumulative 3-Car Quota:
+  activeCars + requestedCars <= 3
+end note
+MDB --> Ctrl : activeBookings (count verified)
+
+opt Add-Ons Requested (ACID Locking - Adv Req 4)
+    loop Each Requested AddOn
+        Ctrl -> MDB : AddOn.findOneAndUpdate(\n  { _id, provider, availableStock >= qty },\n  { $inc: { availableStock: -qty, allocatedStock: qty } }\n)
+        alt Insufficient Stock Available
+            Ctrl -> MDB : abortTransaction() & endSession()
+            Ctrl --> User : 400 Bad Request ("Insufficient add-on stock")
+        else Stock Successfully Locked
+            MDB --> Ctrl : lockedAddOnDoc
         end
     end
+end
 
-    Ctrl->>Pricing: calculateBaselinePrice(dailyRate, durationDays, numOfCars, addOns)
-    Pricing-->>Ctrl: totalPriceSatang (Fixed-Point Satang Integer)
+Ctrl -> Pricing : calculateRentalPrice(dailyRate, duration, numOfCars, addOns)
+activate Pricing
+note over Pricing
+  Fixed-Point Satang Integer:
+  - Same-day rental = 1 day
+  - 7% VAT exact arithmetic
+end note
+Pricing --> Ctrl : totalPriceSatang (Satang Integer)
+deactivate Pricing
 
-    Ctrl->>MDB: Booking.create([bookingPayload], { session })
-    MDB-->>Ctrl: newBookingDoc
+Ctrl -> MDB : Booking.create([bookingPayload], { session })
+MDB --> Ctrl : newBookingDoc
 
-    Ctrl->>MDB: commitTransaction() & endSession()
-    Ctrl-->>User: 201 Created ({ success: true, data: newBookingDoc })
+Ctrl -> MDB : commitTransaction() & endSession()
+deactivate MDB
+
+Ctrl --> User : 201 Created\n{ success: true, data: newBookingDoc }
+deactivate Ctrl
+deactivate Router
+
+@enduml
 ```
