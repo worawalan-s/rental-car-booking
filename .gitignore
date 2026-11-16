@@ -16,3 +16,4 @@ public/uploads/*
 logs/
 *.log
 postman/newman-report.json
+postman/presentation-report.json

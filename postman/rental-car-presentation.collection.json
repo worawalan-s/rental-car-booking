@@ -1,0 +1,1079 @@
+{
+  "info": {
+    "_postman_id": "c1a938e2-5b8d-4e9a-99ef-789012345678",
+    "name": "Rental Car Booking Platform - Presentation Grading Suite (Steps 1-12)",
+    "description": "Course 2110503 Software Development Practice - Final Project Presentation Suite matching Google Sheet Requirements Step 1 to Step 12",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Step 01 - User Registration & Validation Check",
+      "item": [
+        {
+          "name": "1.1: Validation Check - Reject Invalid Thai Phone Number (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 1.1: Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Step 1.1: Rejects invalid phone format (Invariant 2)\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid Phone User\",\n  \"email\": \"invalid_phone_check@test.com\",\n  \"password\": \"password123\",\n  \"tel\": \"12345\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/register",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.2: User Registration - Happy Path (201 Created)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const timestamp = Date.now().toString().slice(-6);",
+                  "const demoEmail = \"demo_user_\" + timestamp + \"@rentaltest.com\";",
+                  "pm.environment.set(\"DEMO_USER_EMAIL\", demoEmail);",
+                  "pm.environment.set(\"DEMO_USER_PASSWORD\", \"password123\");",
+                  "pm.environment.set(\"DEMO_USER_NAME\", \"Demo Presentation User\");",
+                  "pm.environment.set(\"DEMO_USER_TEL\", \"0891234567\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 1.2: Status code is 200 or 201 Created\", function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Step 1.2: Captures new user JWT token & success envelope\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.token).to.be.a(\"string\");",
+                  "    pm.environment.set(\"DEMO_USER_TOKEN\", jsonData.token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{DEMO_USER_NAME}}\",\n  \"email\": \"{{DEMO_USER_EMAIL}}\",\n  \"password\": \"{{DEMO_USER_PASSWORD}}\",\n  \"tel\": \"{{DEMO_USER_TEL}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/register",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 02 - User Log-in",
+      "item": [
+        {
+          "name": "2.1: User Log-in (200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 2.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 2.1: Returns JWT token and success envelope\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.token).to.be.a(\"string\");",
+                  "    pm.environment.set(\"DEMO_USER_TOKEN\", jsonData.token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{DEMO_USER_EMAIL}}\",\n  \"password\": \"{{DEMO_USER_PASSWORD}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/login",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.2: Verify Logged-In User Profile (GET /me - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 2.2: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 2.2: Authenticated user has role user and captures userId\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.role).to.equal(\"user\");",
+                  "    pm.environment.set(\"DEMO_USER_ID\", jsonData.data._id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/me",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 03 - User View Product",
+      "item": [
+        {
+          "name": "3.1: View All Products - Cars Catalog (GET /cars - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 3.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 3.1: Returns car catalog with at least 2 available vehicles\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "    pm.expect(jsonData.count).to.be.at.least(2);",
+                  "    pm.environment.set(\"DEMO_CAR_ID_1\", jsonData.data[0]._id);",
+                  "    pm.environment.set(\"DEMO_CAR_ID_2\", jsonData.data[1]._id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/cars",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cars"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.2: View Single Product Details (GET /cars/:id - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 3.2: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 3.2: Returns car details with brand, model, and dailyRate in Satang\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data._id).to.equal(pm.environment.get(\"DEMO_CAR_ID_1\"));",
+                  "    pm.expect(jsonData.data.dailyRate).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/cars/{{DEMO_CAR_ID_1}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cars",
+                "{{DEMO_CAR_ID_1}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 04 - User Create Booking & Condition Checks",
+      "item": [
+        {
+          "name": "4.1: User Create 1st Booking (201 Created)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const today = new Date();",
+                  "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
+                  "pm.environment.set(\"BOOKING_START_1\", addDays(10));",
+                  "pm.environment.set(\"BOOKING_END_1\", addDays(12));",
+                  "pm.environment.set(\"BOOKING_COLLISION_START\", addDays(11));",
+                  "pm.environment.set(\"BOOKING_COLLISION_END\", addDays(13));",
+                  "pm.environment.set(\"BOOKING_START_2\", addDays(20));",
+                  "pm.environment.set(\"BOOKING_END_2\", addDays(22));",
+                  "pm.environment.set(\"BOOKING_QUOTA_START\", addDays(30));",
+                  "pm.environment.set(\"BOOKING_QUOTA_END\", addDays(32));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 4.1: Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Step 4.1: Successfully created booking 1 and captures ID\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data._id).to.be.a(\"string\");",
+                  "    pm.environment.set(\"DEMO_BOOKING_ID_1\", jsonData.data._id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"car\": \"{{DEMO_CAR_ID_1}}\",\n  \"startDate\": \"{{BOOKING_START_1}}\",\n  \"endDate\": \"{{BOOKING_END_1}}\",\n  \"numOfCars\": 1\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.2: User Create 2nd Booking (201 Created)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 4.2: Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Step 4.2: Successfully created booking 2 and captures ID\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data._id).to.be.a(\"string\");",
+                  "    pm.environment.set(\"DEMO_BOOKING_ID_2\", jsonData.data._id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"car\": \"{{DEMO_CAR_ID_2}}\",\n  \"startDate\": \"{{BOOKING_START_2}}\",\n  \"endDate\": \"{{BOOKING_END_2}}\",\n  \"numOfCars\": 1\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.3: Condition Check 1 - Reject Overlapping Schedule Collision (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 4.3: Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Step 4.3: Rejects overlapping schedule collision (Invariant 5)\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.match(/overlap|collis|already booked|already reserved/i);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"car\": \"{{DEMO_CAR_ID_1}}\",\n  \"startDate\": \"{{BOOKING_COLLISION_START}}\",\n  \"endDate\": \"{{BOOKING_COLLISION_END}}\",\n  \"numOfCars\": 1\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.4: Condition Check 2 - Reject Cumulative 3-Car Quota Limit (400 Bad Request)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 4.4: Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Step 4.4: Rejects booking exceeding cumulative 3-car quota limit (Invariant 4)\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.match(/quota|maximum.*3.*car/i);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"car\": \"{{DEMO_CAR_ID_1}}\",\n  \"startDate\": \"{{BOOKING_QUOTA_START}}\",\n  \"endDate\": \"{{BOOKING_QUOTA_END}}\",\n  \"numOfCars\": 2\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 05 - User View Own Booking",
+      "item": [
+        {
+          "name": "5.1: User View Own Bookings (GET /bookings - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 5.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 5.1: Returns only bookings belonging to authenticated user\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "    pm.expect(jsonData.count).to.be.at.least(1);",
+                  "    const myUserId = pm.environment.get(\"DEMO_USER_ID\");",
+                  "    jsonData.data.forEach(b => {",
+                  "        const bUserId = b.user && b.user._id ? b.user._id : b.user;",
+                  "        pm.expect(String(bUserId)).to.equal(String(myUserId));",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 06 - User Edit Own Booking",
+      "item": [
+        {
+          "name": "6.1: User Update Own Booking Dates (PUT /bookings/:id - 200 OK)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const today = new Date();",
+                  "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
+                  "pm.environment.set(\"UPDATED_END_DATE_1\", addDays(14));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 6.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 6.1: Successfully updated user booking dates\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data._id).to.equal(pm.environment.get(\"DEMO_BOOKING_ID_1\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endDate\": \"{{UPDATED_END_DATE_1}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{DEMO_BOOKING_ID_1}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{DEMO_BOOKING_ID_1}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 07 - User Delete Own Booking",
+      "item": [
+        {
+          "name": "7.1: User Delete Own Booking 1 (DELETE /bookings/:id - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 7.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 7.1: Successfully deletes user booking 1\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{DEMO_BOOKING_ID_1}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{DEMO_BOOKING_ID_1}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "7.2: Verify Deleted Booking Is Gone (GET /bookings/:id - 404 Not Found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 7.2: Status code is 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Step 7.2: Two-key error envelope on deleted booking\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{DEMO_BOOKING_ID_1}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{DEMO_BOOKING_ID_1}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 08 - User Log-out",
+      "item": [
+        {
+          "name": "8.1: User Logout - Invalidate Session (POST /auth/logout - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 8.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 8.1: Successfully clears user authentication session\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{DEMO_USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/logout",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 09 - Admin Log-in",
+      "item": [
+        {
+          "name": "9.1: Admin Log-in (POST /auth/login - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 9.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 9.1: Captures Admin JWT token\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.token).to.be.a(\"string\");",
+                  "    pm.environment.set(\"ADMIN_TOKEN\", jsonData.token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ADMIN_EMAIL}}\",\n  \"password\": \"{{ADMIN_PASSWORD}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/login",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "9.2: Verify Admin Role Privilege (GET /me - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 9.2: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 9.2: Authenticated role is strictly admin\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.role).to.equal(\"admin\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/auth/me",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 10 - Admin View Any Booking",
+      "item": [
+        {
+          "name": "10.1: Admin View All System Bookings (GET /bookings - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 10.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 10.1: Admin can see all bookings across system\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "    pm.expect(jsonData.count).to.be.at.least(1);",
+                  "    const demoBooking2 = pm.environment.get(\"DEMO_BOOKING_ID_2\");",
+                  "    const targetId = demoBooking2 || jsonData.data[0]._id;",
+                  "    pm.environment.set(\"ADMIN_TARGET_BOOKING_ID\", targetId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 11 - Admin Edit Any Booking",
+      "item": [
+        {
+          "name": "11.1: Admin Update Any Booking (PUT /bookings/:id - 200 OK)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const today = new Date();",
+                  "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
+                  "pm.environment.set(\"ADMIN_UPDATED_END_DATE\", addDays(25));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 11.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 11.1: Admin successfully edits booking of any user\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endDate\": \"{{ADMIN_UPDATED_END_DATE}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{ADMIN_TARGET_BOOKING_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{ADMIN_TARGET_BOOKING_ID}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 12 - Admin Delete Any Booking",
+      "item": [
+        {
+          "name": "12.1: Admin Delete Any Booking (DELETE /bookings/:id - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 12.1: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 12.1: Admin successfully deletes any booking in the system\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{ADMIN_TARGET_BOOKING_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{ADMIN_TARGET_BOOKING_ID}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "12.2: Verify Admin Deleted Booking Is Gone (GET /bookings/:id - 404 Not Found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 12.2: Status code is 404 Not Found\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Step 12.2: Two-key error response on admin deleted booking\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{ADMIN_TARGET_BOOKING_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{ADMIN_TARGET_BOOKING_ID}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

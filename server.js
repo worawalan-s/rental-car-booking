@@ -105,50 +105,54 @@ const addons = require('./routes/addons');
 const payments = require('./routes/payments');
 
 // Swagger API Documentation (Task 17 / Issue #24 - Course Assignment 12 specification)
-const swaggerJsDoc = require('swagger-jsdoc');
-const swaggerUI = require('swagger-ui-express');
+try {
+  const swaggerJsDoc = require('swagger-jsdoc');
+  const swaggerUI = require('swagger-ui-express');
 
-const swaggerOptions = {
-  swaggerDefinition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Rental Car Booking API',
-      version: '1.0.0',
-      description:
-        'Course-aligned REST API for Rental Car Booking Platform (Software Development Practice 2110503)',
-      contact: {
-        name: 'Minnie & Praise',
+  const swaggerOptions = {
+    swaggerDefinition: {
+      openapi: '3.0.0',
+      info: {
+        title: 'Rental Car Booking API',
+        version: '1.0.0',
+        description:
+          'Course-aligned REST API for Rental Car Booking Platform (Software Development Practice 2110503)',
+        contact: {
+          name: 'Minnie & Praise',
+        },
       },
-    },
-    servers: [
-      {
-        url: '/api/v1',
-        description: 'Current Host (Auto-detect Active Port)',
-      },
-      {
-        url: 'http://localhost:5003/api/v1',
-        description: 'Course Evaluation / VacQ Test Server',
-      },
-      {
-        url: 'http://localhost:5000/api/v1',
-        description: 'Local Development Server',
-      },
-    ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
+      servers: [
+        {
+          url: '/api/v1',
+          description: 'Current Host (Auto-detect Active Port)',
+        },
+        {
+          url: 'http://localhost:5003/api/v1',
+          description: 'Course Evaluation / VacQ Test Server',
+        },
+        {
+          url: 'http://localhost:5000/api/v1',
+          description: 'Local Development Server',
+        },
+      ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+          },
         },
       },
     },
-  },
-  apis: ['./routes/*.js'],
-};
+    apis: ['./routes/*.js'],
+  };
 
-const swaggerDocs = swaggerJsDoc(swaggerOptions);
-app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerDocs));
+  const swaggerDocs = swaggerJsDoc(swaggerOptions);
+  app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerDocs));
+} catch (_) {
+  // Graceful fallback if swagger-jsdoc is not available
+}
 
 // Base health check
 app.get('/api/v1/health', (req, res) => {

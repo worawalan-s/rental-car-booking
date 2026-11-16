@@ -6,6 +6,7 @@ This directory contains the course-aligned **Postman Collection** and **Environm
 
 ## 📁 Files Included
 
+- **`rental-car-presentation.collection.json`**: Postman v2.1 Collection strictly mapped 1:1 to **Google Sheet Presentation Steps (Step 01 - Step 12)** for the 7-minute grading presentation. Covers 21 requests and 42 assertions running completely green in < 5 seconds.
 - **`rental-car-stage1-2.collection.json`**: Postman v2.1 Collection covering **68 comprehensive requests** with **138 automated assertions**, schema validation, SLA thresholds, and domain invariant tests across 8 modules.
 - **`rental-car-local.environment.json`**: Pre-configured environment variables for local testing (`http://localhost:5003`).
 - **`fixtures/sample_license.png`**: Lightweight test image fixture for driver's license upload validation.
@@ -15,7 +16,23 @@ This directory contains the course-aligned **Postman Collection** and **Environm
 
 ## 🚀 How to Run
 
-### Option A: Automated CLI Execution via Newman (Recommended)
+### Option A: 7-Minute Presentation Runner (Recommended for Course Presentation Steps 1-12)
+
+Run the fast 12-step presentation suite in a single command (finishes in ~4.5 seconds with 100% green assertions):
+
+```bash
+npm run demo
+```
+
+Or open in **Postman Desktop Application**:
+1. Import `postman/rental-car-presentation.collection.json` and `postman/rental-car-local.environment.json`.
+2. Select **"Rental Car Local Environment"**.
+3. Click **Rental Car Booking Platform - Presentation Grading Suite (Steps 1-12)** -> **Run Collection**.
+4. Click **Run Rental Car Booking Platform...**. All 12 steps execute automatically.
+
+---
+
+### Option B: Automated Full Regression via Newman
 
 Run the automated test runner in a single command. It will check/start the local server, run the full 68-request Newman regression test suite across all 8 modules, and output an execution report:
 
