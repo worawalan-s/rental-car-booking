@@ -1,23 +1,20 @@
 @startuml class_diagram
 skinparam BackgroundColor #0B1120
-skinparam roundcorner 8
+skinparam roundcorner 10
 skinparam shadowing false
 skinparam defaultFontName "Helvetica, Arial, sans-serif"
-skinparam defaultFontSize 13
-
-' Remove muddy icons, use clear high-contrast text + and -
-skinparam classAttributeIconSize 0
+skinparam defaultFontSize 11
 
 skinparam class {
     BackgroundColor #0F172A
-    BorderColor #38BDF8
-    BorderThickness 2
+    BorderColor #0EA5E9
+    BorderThickness 1.8
     HeaderBackgroundColor #1E293B
     FontColor #FFFFFF
-    FontSize 15
+    FontSize 14
     FontStyle bold
     AttributeFontColor #FFFFFF
-    AttributeFontSize 13
+    AttributeFontSize 12
 }
 
 skinparam stereotypeCBackgroundColor #0284C7
@@ -25,9 +22,9 @@ skinparam stereotypeCFontColor #FFFFFF
 
 skinparam arrow {
     Color #38BDF8
-    Thickness 2
+    Thickness 1.8
     FontColor #94A3B8
-    FontSize 11
+    FontSize 10
 }
 
 class User <<Mongoose Model>> {
@@ -35,7 +32,7 @@ class User <<Mongoose Model>> {
     +name: String
     +tel: String [Regex: /^0[0-9]{9}$/]
     +email: String [unique]
-    +role: Enum ('user', 'admin')
+    +role: Enum ('user' | 'admin')
     +password: String [bcrypt salt=10]
     +driverLicense: Object { s3Key, url }
     +createdAt: Date
@@ -44,18 +41,17 @@ class User <<Mongoose Model>> {
     +getSignedJwtToken(): String
 }
 
-class Booking <<Mongoose Model>> {
+class Provider <<Mongoose Model>> {
     -_id: ObjectId
-    +user: ObjectId <<Ref: User>>
-    +car: ObjectId <<Ref: Car>>
-    +provider: ObjectId <<Ref: Provider>>
-    +startDate: Date [start >= today]
-    +endDate: Date [end >= start, <= 30d]
-    +numOfCars: Number [1..3 quota]
-    +status: Enum ('Pending', 'Confirmed', 'Active', 'Completed', 'Cancelled')
-    +totalPrice: Number [Satang Integer, 7% VAT]
-    +addOns: BookingAddOn[] [Embedded Subdocs]
+    +name: String [unique, trim]
+    +address: String
+    +tel: String [Regex: /^0[0-9]{9}$/]
     +createdAt: Date
+    -- Virtual Relationships --
+    +cars: Car[] <<virtual populate 1:N>>
+    +addOns: AddOn[] <<virtual populate 1:N>>
+    -- Cache Invariant --
+    +Redis cache key: 'providers:all'
 }
 
 class Car <<Mongoose Model>> {
@@ -74,17 +70,18 @@ class Car <<Mongoose Model>> {
     +existingStart < newEnd && existingEnd > newStart
 }
 
-class Provider <<Mongoose Model>> {
+class Booking <<Mongoose Model>> {
     -_id: ObjectId
-    +name: String [unique, trim]
-    +address: String
-    +tel: String [Regex: /^0[0-9]{9}$/]
+    +user: ObjectId <<Ref: User>>
+    +car: ObjectId <<Ref: Car>>
+    +provider: ObjectId <<Ref: Provider>>
+    +startDate: Date [start >= today]
+    +endDate: Date [end >= start, <= 30d]
+    +numOfCars: Number [1..3 quota]
+    +status: Enum ('Pending', 'Confirmed', 'Active', 'Completed', 'Cancelled')
+    +totalPrice: Number [Satang Integer, 7% VAT]
+    +addOns: BookingAddOn[] [Embedded Subdocs]
     +createdAt: Date
-    -- Virtual Relationships --
-    +cars: Car[] <<virtual populate 1:N>>
-    +addOns: AddOn[] <<virtual populate 1:N>>
-    -- Cache Invariant --
-    +Redis cache key: 'providers:all'
 }
 
 class AddOn <<Mongoose Model>> {
@@ -106,14 +103,13 @@ class BookingAddOn <<Embedded Subdocument>> {
     +price: Number [Satang Integer at booking]
 }
 
-' Layout connections
-User "1" -right-> "0..*" Booking : places
-Booking "0..*" <-left- "1" Car : reserved_for
-User -[hidden]down-> Provider
-Provider "1" *-right- "0..*" AddOn : stocks
-Provider "1" *-- "0..*" Car : owns
+' Entity Relationships
+Provider "1" *-- "0..*" Car : owns (1:N Virtual)
+Provider "1" *-- "0..*" AddOn : stocks (1:N Virtual)
+User "1" --> "0..*" Booking : places (Ownership Scoped)
+Car "1" --> "0..*" Booking : reserved_for (Schedule Checked)
 Provider "1" --> "0..*" Booking : fulfills
-Booking "1" *-down- "0..*" BookingAddOn : attaches
-BookingAddOn "0..*" -left-> "1" AddOn : references
+Booking "1" *-- "0..*" BookingAddOn : attaches (Embedded Array)
+BookingAddOn "1" --> "1" AddOn : references (Pessimistic Lock)
 
 @enduml
