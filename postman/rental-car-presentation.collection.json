@@ -319,15 +319,17 @@
                 "type": "text/javascript",
                 "exec": [
                   "const today = new Date();",
+                  "const baseOffset = 10 + Math.floor(Math.random() * 500);",
                   "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
-                  "pm.environment.set(\"BOOKING_START_1\", addDays(10));",
-                  "pm.environment.set(\"BOOKING_END_1\", addDays(12));",
-                  "pm.environment.set(\"BOOKING_COLLISION_START\", addDays(11));",
-                  "pm.environment.set(\"BOOKING_COLLISION_END\", addDays(13));",
-                  "pm.environment.set(\"BOOKING_START_2\", addDays(20));",
-                  "pm.environment.set(\"BOOKING_END_2\", addDays(22));",
-                  "pm.environment.set(\"BOOKING_QUOTA_START\", addDays(30));",
-                  "pm.environment.set(\"BOOKING_QUOTA_END\", addDays(32));"
+                  "pm.environment.set(\"BASE_OFFSET\", baseOffset);",
+                  "pm.environment.set(\"BOOKING_START_1\", addDays(baseOffset));",
+                  "pm.environment.set(\"BOOKING_END_1\", addDays(baseOffset + 2));",
+                  "pm.environment.set(\"BOOKING_COLLISION_START\", addDays(baseOffset + 1));",
+                  "pm.environment.set(\"BOOKING_COLLISION_END\", addDays(baseOffset + 3));",
+                  "pm.environment.set(\"BOOKING_START_2\", addDays(baseOffset + 5));",
+                  "pm.environment.set(\"BOOKING_END_2\", addDays(baseOffset + 7));",
+                  "pm.environment.set(\"BOOKING_QUOTA_START\", addDays(baseOffset + 10));",
+                  "pm.environment.set(\"BOOKING_QUOTA_END\", addDays(baseOffset + 12));"
                 ]
               }
             },
@@ -592,8 +594,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "const today = new Date();",
+                  "const baseOffset = Number(pm.environment.get(\"BASE_OFFSET\")) || 10;",
                   "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
-                  "pm.environment.set(\"UPDATED_END_DATE_1\", addDays(14));"
+                  "pm.environment.set(\"UPDATED_END_DATE_1\", addDays(baseOffset + 4));"
                 ]
               }
             },
@@ -936,8 +939,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "const today = new Date();",
+                  "const baseOffset = Number(pm.environment.get(\"BASE_OFFSET\")) || 10;",
                   "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
-                  "pm.environment.set(\"ADMIN_UPDATED_END_DATE\", addDays(25));"
+                  "pm.environment.set(\"ADMIN_UPDATED_END_DATE\", addDays(baseOffset + 8));"
                 ]
               }
             },
@@ -1173,9 +1177,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "const today = new Date();",
+                  "const baseOffset = Number(pm.environment.get(\"BASE_OFFSET\")) || 10;",
                   "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
-                  "pm.environment.set(\"PRICING_START\", addDays(40));",
-                  "pm.environment.set(\"PRICING_END\", addDays(43));"
+                  "pm.environment.set(\"PRICING_START\", addDays(baseOffset + 20));",
+                  "pm.environment.set(\"PRICING_END\", addDays(baseOffset + 23));"
                 ]
               }
             },
@@ -1280,10 +1285,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "const today = new Date();",
-                  "const offset = 60 + Math.floor(Math.random() * 300);",
+                  "const baseOffset = Number(pm.environment.get(\"BASE_OFFSET\")) || 10;",
                   "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
-                  "pm.environment.set(\"EXTRA_BOOKING_START\", addDays(offset));",
-                  "pm.environment.set(\"EXTRA_BOOKING_END\", addDays(offset + 2));"
+                  "pm.environment.set(\"EXTRA_BOOKING_START\", addDays(baseOffset + 30));",
+                  "pm.environment.set(\"EXTRA_BOOKING_END\", addDays(baseOffset + 32));"
                 ]
               }
             },
