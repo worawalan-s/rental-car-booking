@@ -1280,9 +1280,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "const today = new Date();",
+                  "const offset = 60 + Math.floor(Math.random() * 300);",
                   "const addDays = (d) => new Date(today.getTime() + d * 86400000).toISOString().split(\"T\")[0];",
-                  "pm.environment.set(\"EXTRA_BOOKING_START\", addDays(50));",
-                  "pm.environment.set(\"EXTRA_BOOKING_END\", addDays(52));"
+                  "pm.environment.set(\"EXTRA_BOOKING_START\", addDays(offset));",
+                  "pm.environment.set(\"EXTRA_BOOKING_END\", addDays(offset + 2));"
                 ]
               }
             },
@@ -1484,6 +1485,47 @@
                 "v1",
                 "payments",
                 "webhook"
+              ]
+            }
+          }
+        },
+        {
+          "name": "15.7: Cleanup Extra Credit Demo Booking (DELETE /bookings/:id - 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Step 15.7: Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Step 15.7: Successfully cleaned up booking and restored add-on stock\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ADMIN_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{URL}}/api/v1/bookings/{{EXTRA_BOOKING_ID}}",
+              "host": [
+                "{{URL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{EXTRA_BOOKING_ID}}"
               ]
             }
           }
